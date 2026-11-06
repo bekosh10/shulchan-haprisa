@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="258">
+<meta name="app-version" content="259">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -2072,7 +2072,7 @@ function undo(){if(!hist.length){toast('אין פעולה לבטל');return}fut.
 function redo(){if(!fut.length)return;hist.push(snapshot());restore(fut.pop());updUndo()}
 
 /* ---------- sheet actions ---------- */
-function newManualSheet(mediaId){const m=mediaById(mediaId);const sh={sid:nid('s'),mediaId:m.id,manual:true,placements:[],minLen:0};if(m.type==='roll')sh.len=Math.min(+m.h,2400);else sh.ov={w:2400,h:1200};S.sheets.push(sh);S.cur=S.sheets.length-1;S.sel.clear();return sh}
+function newManualSheet(mediaId){const m=mediaById(mediaId);const sh={sid:nid('s'),mediaId:m.id,manual:true,placements:[],minLen:0};if(m.type==='roll'){sh.ov={w:1200};sh.len=Math.min(+m.h||2950,2950)}else sh.ov={w:2400,h:1200};S.sheets.push(sh);S.cur=S.sheets.length-1;S.sel.clear();return sh}
 function fillSig(it,sh){const b=box(it);return [sh.sid,sh.placements.length,it.sx,it.sy,b.B,it.space,it.orient].join('|')}
 function canAdd(it){const sh=curSheet();if(!sh)return true;if(it.fill)return it._fillSig!==fillSig(it,sh);return (countPlaced([sh])[it.id]||0)<(it.qty|0)}
 function rollLim(sh){const m=mediaOf(sh);if(m.type!=='roll')return null;return sh.len>0?Math.min(+m.h,sh.len):+m.h}
