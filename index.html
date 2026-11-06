@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="263">
+<meta name="app-version" content="264">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -3156,7 +3156,7 @@ async function renderDeskSet(){const box=document.getElementById('deskSet');if(!
   const row=(k,l)=>`<div class="deskrow"><b>${l}</b><span class="mono small" dir="ltr" title="${esc(c[k])}">${esc(c[k])}</span><button type="button" class="btn sm" data-deskact="pick" data-k="${k}">שנה…</button><button type="button" class="btn sm" data-deskact="open" data-k="${k}">פתח</button></div>`;
   box.innerHTML=`<legend>תיקיות ועדכונים</legend>${row('jobsDir','עבודות')}${row('printDir','print')}${row('cutDir','cut')}${c.dxfDir?row('dxfDir','DXF'):''}
     <p class="hint" style="margin:2px 0 6px">"שמור" כותב את העבודה כקובץ בתיקיית העבודות. בייצוא, קובצי ההדפסה נכתבים ל-print וקובצי החיתוך (PDF ו-DXF) ל-cut.</p>
-    <div class="deskrow"><b>גרסה</b><span class="small">${esc(c.appVersion)}</span><button type="button" class="btn sm" data-deskact="check">בדוק עדכון</button><span class="small" id="updMsg"></span></div>
+    <div class="deskrow"><b>גרסה</b><span class="small">${esc(c.appVersion)}</span><button type="button" class="btn sm" data-deskact="check">בדוק עדכון</button><span></span></div><div class="small" id="updMsg" style="margin:2px 0 4px;line-height:1.6;white-space:normal"></div>
     <label class="field" style="margin-top:4px"><span class="small muted">כתובת העדכונים</span><input type="text" dir="ltr" id="updUrl" value="${esc(c.updateUrl)}" style="font-size:12px"></label>`}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-deskact]');if(!b)return;const a=b.dataset.deskact;
   if(a==='exportCfg')return exportSettings();if(a==='importCfg')return importSettings();if(!window.desk)return;
@@ -3165,7 +3165,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-desk
   else if(a==='check'){const m=document.getElementById('updMsg');const u=document.getElementById('updUrl');if(u)await window.desk.setCfg({updateUrl:u.value.trim()});m.textContent='בודק…';
     try{const r=await window.desk.checkUpdate();if(!r.available){m.textContent='✓ יש לך את הגרסה האחרונה ('+r.current+')';return}
       if(!r.shellOk){m.innerHTML='יש גרסה '+esc(r.latest)+' אבל היא צריכה התקנה חדשה של התוכנה';return}
-      m.innerHTML=`יש גרסה חדשה: <b>${esc(r.latest)}</b> ${r.notes?'· '+esc(r.notes):''} <button type="button" class="btn sm primary" data-deskact="apply">עדכן עכשיו</button>`}catch(err){m.textContent='לא הצלחתי לבדוק: '+(err.message||err)}}
+      m.innerHTML=`<button type="button" class="btn sm primary" data-deskact="apply">עדכן עכשיו</button> יש גרסה חדשה: <b>${esc(r.latest)}</b>${r.notes?`<div class="muted">${esc(r.notes)}</div>`:''}`}catch(err){m.textContent='לא הצלחתי לבדוק: '+(err.message||err)}}
   else if(a==='apply'||a==='applyTop'){const m=document.getElementById('updMsg');if(m)m.textContent='מוריד…';try{await flushSave();await window.desk.applyUpdate();toast('מעדכן…')}catch(err){toast('העדכון נכשל: '+(err.message||err));if(m)m.textContent='העדכון נכשל'}}});
 if(window.desk){setTimeout(async()=>{try{const c=await window.desk.getCfg();if(!c.autoCheck)return;const r=await window.desk.checkUpdate();if(r.available&&r.shellOk){const t=document.createElement('button');t.className='btn sm primary updtop';t.dataset.deskact='applyTop';t.textContent='🔄 יש גרסה חדשה ('+r.latest+') – לעדכן';document.body.appendChild(t)}}catch(e){}},4000)}
 async function openJobText(text,fname){busy(true,'פותח עבודה…');
