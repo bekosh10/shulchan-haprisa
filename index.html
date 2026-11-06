@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="261">
+<meta name="app-version" content="262">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -3127,8 +3127,9 @@ async function downloadJobFile(){const dl=await getDL();if(!dl){toast('שמיר�
     const safe=(jobName||'layout-job').replace(/[\\/:*?"<>|]+/g,'-').slice(0,60);
     await dl.save({filename:safe+'.json',data:JSON.stringify(data)});toast('קובץ הגיבוי נשמר')}catch(err){busy(false);if(err&&err.code==='declined')toast('השמירה בוטלה');else toast('השמירה נכשלה: '+((err&&err.message)||err))}}
 async function saveAsJob(){const r=await modal('שמירה בשם',`<div dir="rtl"><label class="field" style="width:100%">שם העבודה<input type="text" name="nm" dir="ltr" style="text-align:left" value="${esc(jobName||'')}" placeholder="למשל 26001234 tor poly04"></label>
-  <p class="hint">"שמור" שומר עבודה בשם הזה ב״העבודות שלי״. אם לעבודה כבר יש שם אחר, נוצר עותק חדש והעבודה הקודמת נשארת כמו שהיא. מכאן והלאה כפתור "שמור" מעדכן את העבודה החדשה.</p>
-  <p class="hint">"קובץ גיבוי" מוריד קובץ ‎.json‎ עם כל העבודה, כדי להעביר למחשב אחר.</p></div>`,[{v:'save',label:'שמור',primary:true},{v:'file',label:'קובץ גיבוי (.json)'},{v:'cancel',label:'ביטול'}]);
+  ${window.desk?`<p class="hint">"שמור" כותב את העבודה כקובץ <b>‎.shulchan‎</b> בשם הזה בתיקיית העבודות (ובוחרים אותה גם ב״העבודות שלי״). אם לעבודה כבר יש שם אחר, נוצר עותק חדש והקודמת נשארת. מכאן והלאה "שמור" מעדכן את הקובץ החדש.</p>`
+   :`<p class="hint">"שמור" שומר עבודה בשם הזה ב״העבודות שלי״. אם לעבודה כבר יש שם אחר, נוצר עותק חדש והעבודה הקודמת נשארת כמו שהיא. מכאן והלאה כפתור "שמור" מעדכן את העבודה החדשה.</p>
+  <p class="hint">"קובץ גיבוי" מוריד קובץ ‎.json‎ עם כל העבודה, כדי להעביר למחשב אחר.</p>`}</div>`,window.desk?[{v:'save',label:'שמור',primary:true},{v:'cancel',label:'ביטול'}]:[{v:'save',label:'שמור',primary:true},{v:'file',label:'קובץ גיבוי (.json)'},{v:'cancel',label:'ביטול'}]);
   if(r.v==='cancel')return;const nm=String(r.vals.nm||'').trim();
   if(r.v==='file'){if(nm&&nm!==jobName){jobName=nm;$('#jobName').value=nm}await downloadJobFile();return}
   if(!nm){toast('צריך לכתוב שם לעבודה');return saveAsJob()}
