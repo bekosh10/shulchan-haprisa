@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="259">
+<meta name="app-version" content="260">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -2257,7 +2257,7 @@ function renderItems(){
 
 function propTargets(){return[...S.isel].map(itemById).filter(Boolean)}
 function common(T,fn){const v=fn(T[0]);return T.every(it=>fn(it)===v)?v:null}
-function renderProps(){const T=propTargets();{const d=$('#delSelBtn');if(d){d.hidden=T.length<2;d.textContent=`מחק (${T.length})`;d.title=`מחק ${T.length} עמודים`}}$('#bulk').innerHTML=T.length>1?`<div class="bulkbox"><div class="row"><b style="flex:1">עריכה משותפת</b><button class="btn sm" data-pa="clearsel">נקה בחירה</button></div>${propsHTML(T)}</div>`:''}
+function renderProps(){const T=propTargets();{const d=$('#delSelBtn');if(d){d.hidden=T.length<1||!S.isel.size;d.textContent=T.length>1?`מחק (${T.length})`:'מחק';d.title=T.length>1?`מחק ${T.length} עמודים`:'מחק את העמוד המסומן'}}$('#bulk').innerHTML=T.length>1?`<div class="bulkbox"><div class="row"><b style="flex:1">עריכה משותפת</b><button class="btn sm" data-pa="clearsel">נקה בחירה</button></div>${propsHTML(T)}</div>`:''}
 function propsHTML(T){let html='';
   const totals=countPlaced(S.sheets);const u=U(),ul=UL();
   const unitSeg=`<div class="row"><span class="small muted">יחידות</span><div class="seg"><button data-pa="unit" data-u="cm" aria-pressed="${S.unit==='cm'}">ס״מ</button><button data-pa="unit" data-u="mm" aria-pressed="${S.unit==='mm'}">מ״מ</button></div></div>`;
@@ -2805,7 +2805,9 @@ $('#sampleNote').addEventListener('click',e=>{if(!e.target.closest('[data-act="c
   for(const sh of S.sheets)sh.placements=sh.placements.filter(p=>!ids.has(p.iid));S.sheets=S.sheets.filter(sh=>sh.placements.length);S.cur=0;S.sel.clear();S.isel.clear();renderAll()});
 $('#groupTogether').addEventListener('change',e=>{S.nest.group=e.target.checked;saveSettings()});
 $('#selAllItems').addEventListener('change',e=>{S.isel=e.target.checked?new Set(S.items.map(i=>i.id)):new Set();renderItems();renderProps();renderStage();renderStrip()});
-$('#delSelBtn').addEventListener('click',()=>{const b=$('#bulk [data-pa=delsel]');if(b)b.click()});
+$('#delSelBtn').addEventListener('click',async()=>{const b=$('#bulk [data-pa=delsel]');if(b){b.click();return}
+  const T=propTargets();if(!T.length)return;const r=await modal('מחיקת עמוד',`<p>למחוק את העמוד <b>${esc(T[0].name||'')}</b> מהעבודה, כולל כל העותקים שלו על הגיליונות?</p><p class="hint">אפשר לבטל עם Ctrl+Z.</p>`,[{v:'del',label:'מחק',primary:true},{v:'no',label:'ביטול'}]);
+  if(r.v!=='del')return;snap();const ids=new Set(T.map(t=>t.id));S.items=S.items.filter(i=>!ids.has(i.id));for(const sh of S.sheets)sh.placements=sh.placements.filter(p=>!ids.has(p.iid));S.isel.clear();S.sel.clear();renderAll();toast('העמוד נמחק')});
 $('#expAll').addEventListener('click',e=>{const close=!!e.currentTarget.dataset.open;S.items.forEach(it=>{it.open=!close;if(it.fid)S.fileOpen[it.fid]=!close});renderItems()});
 
 /* properties */
