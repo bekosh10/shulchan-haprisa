@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="262">
+<meta name="app-version" content="263">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -3098,9 +3098,9 @@ const IDB={db:null,
   put(st,k,v){return new Promise(res=>{if(!IDB.db)return res(false);try{const tx=IDB.db.transaction(st,'readwrite');tx.objectStore(st).put(v,k);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false)}catch(e){res(false)}})},
   get(st,k){return new Promise(res=>{if(!IDB.db)return res(null);try{const r=IDB.db.transaction(st).objectStore(st).get(k);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)}catch(e){res(null)}})}};
 const savedF=new Set();let saveT=0,booted=false;
-let jobId=null,jobName='';
+let jobId=null,jobName='',jobPath='';
 const newJobId=()=>'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-function jobData(){return{v:3,id:jobId,name:jobName,updated:Date.now(),uid,nextNo:S.nextNo,cur:S.cur,items:S.items.map(it=>{const o=Object.assign({},it);delete o._raw;return o}),sheets:S.sheets,
+function jobData(){return{v:3,id:jobId,name:jobName,path:jobPath||undefined,updated:Date.now(),uid,nextNo:S.nextNo,cur:S.cur,items:S.items.map(it=>{const o=Object.assign({},it);delete o._raw;return o}),sheets:S.sheets,
   settings:{subsAll:(S.subs||[]).filter(b=>S.media.some(m=>m.sub===b.id&&(m.id===S.active||S.sheets.some(x=>x.mediaId===m.id)))),mediaAll:S.media.filter(m=>m.id===S.active||S.sheets.some(x=>x.mediaId===m.id)),media:mediaById(S.active),marks:S.marks,nest:S.nest,cfg:S.cfg,dpi:S.dpi,spotMap:S.spotMap}}}
 function scheduleSave(){if(!booted)return;clearTimeout(saveT);saveT=setTimeout(async()=>{if(!IDB.db)return;
   for(const fid of Object.keys(S.files))if(!savedF.has(fid)){if(await IDB.put('files',fid,S.files[fid]))savedF.add(fid)}
@@ -3109,7 +3109,7 @@ function scheduleSave(){if(!booted)return;clearTimeout(saveT);saveT=setTimeout(a
   if(await IDB.put('kv','job:'+jobId,d0)){const d=new Date();$('#savedLbl').textContent=`נשמר בדפדפן ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}},1200)}
 function applyJobSettings(st){if(!st)return;if(!S.subs)S.subs=[];for(const bb of st.subsAll||[]){if(!S.subs.some(b=>b.id===bb.id))S.subs.push(JSON.parse(JSON.stringify(bb)))}for(const mm of st.mediaAll||[]){if(!S.media.some(m=>m.id===mm.id))S.media.push(Object.assign({},mm))}if(st.media){const ex=S.media.find(m=>m.id===st.media.id);if(ex)Object.assign(ex,st.media);else S.media.push(Object.assign({},st.media));S.active=st.media.id}
   for(const k of['marks','nest','cfg'])if(st[k])Object.assign(S[k],st[k]);if(!(st.nest&&st.nest.gapV2)){S.nest.gap=0;S.nest.gapV2=1}if(S.nest.defBleed==null)S.nest.defBleed=3;normCfg();if(st.dpi)S.dpi=st.dpi;S.spotMap=st.spotMap||{};saveSettings()}
-function loadJob(j,files){jobId=j.id||newJobId();jobName=j.name||'';$('#jobName').value=jobName;applyJobSettings(j.settings);S.items=(j.items||[]).map(it=>Object.assign(newItemShell(),it,{open:false}));S.fileOpen={};S.sheets=j.sheets||[];S.cur=Math.min(j.cur||0,Math.max(0,S.sheets.length-1));S.files=files;
+function loadJob(j,files){jobId=j.id||newJobId();jobName=j.name||'';jobPath=j.path||'';$('#jobName').value=jobName;applyJobSettings(j.settings);S.items=(j.items||[]).map(it=>Object.assign(newItemShell(),it,{open:false}));S.fileOpen={};S.sheets=j.sheets||[];S.cur=Math.min(j.cur||0,Math.max(0,S.sheets.length-1));S.files=files;
   uid=Math.max(uid,j.uid||1);S.nextNo=Math.max(S.nextNo,j.nextNo||1);S.sel.clear();S.isel.clear();hist=[];fut=[]}
 function newItemShell(){return{trim:[0,0,0,0],sx:1,sy:1,bleed:0,space:null,cutMode:'rect',contours:null,frame:true,orient:'auto',qty:1,fill:false,group:'',lockScale:true}}
 async function openSavedJob(id){const j=await IDB.get('kv','job:'+id);if(!j)return false;const files={};
@@ -3120,7 +3120,7 @@ async function restoreSaved(){const last=await IDB.get('kv','last');if(last&&awa
   loadJob(j,files);return true}
 function jobFileText(){const files={};for(const[fid,f]of Object.entries(S.files)){if(S.items.some(i=>i.fid===fid||(i.back&&i.back.fid===fid)))files[fid]={name:f.name,b64:u8ToB64(f.bytes)}}return JSON.stringify(Object.assign(jobData(),{app:'layout-bench',files}))}
 /* desktop: every explicit save also writes the job as a file in the jobs folder */
-async function deskSaveJob(){if(!window.desk||!jobName)return null;try{const r=await window.desk.saveJob(jobName,jobFileText());return r}catch(e){toast('השמירה לתיקייה נכשלה: '+(e.message||e));return null}}
+async function deskSaveJob(){if(!window.desk||!jobName)return null;try{if(jobPath&&window.desk.saveJobTo){const r=await window.desk.saveJobTo(jobPath,jobFileText());return r}const r=await window.desk.saveJob(jobName,jobFileText());return r}catch(e){toast('השמירה לתיקייה נכשלה: '+(e.message||e));return null}}
 async function downloadJobFile(){const dl=await getDL();if(!dl){toast('שמירת קבצים עובדת כשהעמוד פתוח בתוך Claude');return}
   busy(true,'מכין קובץ עבודה…');try{const files={};for(const[fid,f]of Object.entries(S.files)){if(S.items.some(i=>i.fid===fid||(i.back&&i.back.fid===fid)))files[fid]={name:f.name,b64:u8ToB64(f.bytes)}}
     const data=Object.assign(jobData(),{app:'layout-bench',files});busy(false);
@@ -3133,10 +3133,14 @@ async function saveAsJob(){const r=await modal('שמירה בשם',`<div dir="rt
   if(r.v==='cancel')return;const nm=String(r.vals.nm||'').trim();
   if(r.v==='file'){if(nm&&nm!==jobName){jobName=nm;$('#jobName').value=nm}await downloadJobFile();return}
   if(!nm){toast('צריך לכתוב שם לעבודה');return saveAsJob()}
+  if(window.desk&&window.desk.saveJobAs){const prevName=jobName,prevId=jobId,prevPath=jobPath;if(jobName&&nm!==jobName)jobId=newJobId();jobName=nm;jobPath='';
+    let res=null;try{res=await window.desk.saveJobAs(nm,jobFileText(),prevPath?prevPath.replace(/[^\/\\]+$/,'')+nm+'.shulchan':'')}catch(e){toast('השמירה נכשלה: '+(e.message||e))}
+    if(!res){jobName=prevName;jobId=prevId;jobPath=prevPath;return}
+    jobName=res.name||nm;jobPath=res.path;$('#jobName').value=jobName;await flushSave();renderAll();toast(`נשמר: ${res.path}. מעכשיו "שמור" מעדכן את הקובץ הזה`);return}
   await flushSave();if(jobName&&nm!==jobName)jobId=newJobId();jobName=nm;$('#jobName').value=nm;await flushSave();const dr=await deskSaveJob();renderAll();toast(`העבודה נשמרה בשם "${nm}"${dr?' · גם כקובץ בתיקיית העבודות':''}. מעכשיו "שמור" מעדכן אותה`)}
 $('#saveAsJob').addEventListener('click',saveAsJob);
-$('#saveJob').addEventListener('click',async()=>{if(!jobName){saveAsJob();return}await flushSave();const dr=await deskSaveJob();toast(`העדכונים נשמרו${dr?' בתיקיית העבודות':' ב״העבודות שלי״'} · ${jobName}`)});
-$('#openJob').addEventListener('click',()=>$('#jobIn').click());
+$('#saveJob').addEventListener('click',async()=>{if(!jobName){saveAsJob();return}await flushSave();const dr=await deskSaveJob();toast(`העדכונים נשמרו${dr?(jobPath?' בקובץ '+jobPath.split(/[\\/]/).pop():' בתיקיית העבודות'):' ב״העבודות שלי״'} · ${jobName}`)});
+$('#openJob').addEventListener('click',async()=>{if(window.desk&&window.desk.openJobDialog){const d=await window.desk.openJobDialog();if(!d)return;await openJobText(d.text,d.name);if(/\.shulchan$/i.test(d.path)){jobPath=d.path;jobName=d.name.replace(/\.shulchan$/i,'');$('#jobName').value=jobName;scheduleSave()}return}$('#jobIn').click()});
 /* ---- settings transfer + desktop folders / updates ---- */
 function settingsBlob(){return JSON.stringify({app:'layout-bench-settings',version:(document.querySelector('meta[name="app-version"]')||{}).content||'',saved:Date.now(),subs:S.subs,media:S.media,active:S.active,marks:S.marks,nest:S.nest,cfg:S.cfg,dpi:S.dpi,spotMap:S.spotMap,unit:S.unit})}
 async function exportSettings(){const name='shulchan-settings-'+new Date().toISOString().slice(0,10)+'.json';const data=settingsBlob();
@@ -3150,7 +3154,7 @@ function importSettings(){const inp=document.createElement('input');inp.type='fi
     normCfg();saveSettings();renderAll();toast('ההגדרות יובאו')}catch(e){toast('לא הצלחתי לייבא: '+(e.message||e))}};inp.click()}
 async function renderDeskSet(){const box=document.getElementById('deskSet');if(!box||!window.desk)return;const c=await window.desk.getCfg();
   const row=(k,l)=>`<div class="deskrow"><b>${l}</b><span class="mono small" dir="ltr" title="${esc(c[k])}">${esc(c[k])}</span><button type="button" class="btn sm" data-deskact="pick" data-k="${k}">שנה…</button><button type="button" class="btn sm" data-deskact="open" data-k="${k}">פתח</button></div>`;
-  box.innerHTML=`<legend>תיקיות ועדכונים</legend>${row('jobsDir','עבודות')}${row('printDir','print')}${row('cutDir','cut')}
+  box.innerHTML=`<legend>תיקיות ועדכונים</legend>${row('jobsDir','עבודות')}${row('printDir','print')}${row('cutDir','cut')}${c.dxfDir?row('dxfDir','DXF'):''}
     <p class="hint" style="margin:2px 0 6px">"שמור" כותב את העבודה כקובץ בתיקיית העבודות. בייצוא, קובצי ההדפסה נכתבים ל-print וקובצי החיתוך (PDF ו-DXF) ל-cut.</p>
     <div class="deskrow"><b>גרסה</b><span class="small">${esc(c.appVersion)}</span><button type="button" class="btn sm" data-deskact="check">בדוק עדכון</button><span class="small" id="updMsg"></span></div>
     <label class="field" style="margin-top:4px"><span class="small muted">כתובת העדכונים</span><input type="text" dir="ltr" id="updUrl" value="${esc(c.updateUrl)}" style="font-size:12px"></label>`}
@@ -3169,7 +3173,7 @@ async function openJobText(text,fname){busy(true,'פותח עבודה…');
     if(Array.isArray(j.media)&&j.media.length){for(const m of j.media)if(!S.media.some(x=>x.id===m.id))S.media.push(m);saveSettings()}
     await flushSave();j.id=newJobId();loadJob(j,files);busy(false);renderAll();toast('העבודה נפתחה')}catch(err){busy(false);toast('לא הצלחתי לפתוח: '+(err.message||err))}}
 $('#jobIn').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;openJobText(await f.text(),f.name)});
-if(window.desk)window.desk.onOpenJob(d=>openJobText(d.text,d.name));
+if(window.desk)window.desk.onOpenJob(async d=>{await openJobText(d.text,d.name);if(d.path){jobPath=d.path;jobName=String(d.name||'').replace(/\.(shulchan|json)$/i,'')||jobName;$('#jobName').value=jobName;scheduleSave()}});
 async function flushSave(){clearTimeout(saveT);if(!booted||!IDB.db||!S.items.length&&!jobName)return;if(!jobId)jobId=newJobId();
   for(const fid of Object.keys(S.files))if(!savedF.has(fid)){if(await IDB.put('files',fid,S.files[fid]))savedF.add(fid)}
   const d0=jobData();const idx=(await IDB.get('kv','jobs'))||[];const row={id:jobId,name:jobName||'עבודה ללא שם',updated:d0.updated,media:mediaById(S.active).name,count:S.items.length,sheets:S.sheets.length};
@@ -3331,12 +3335,16 @@ $('#expBtn').addEventListener('click',async()=>{
         const on=k=>!(S.cfg.dxfOff||{})[k];const row=(k,lbl,nm,def)=>`<label class="field exlay ${pres.has(k)?'':'exabsent'}" ${pres.has(k)?'':'hidden'}><span class="exlh"><input type="checkbox" name="on_${k}" ${on(k)?'checked':''}> ${lbl}</span><input type="text" dir="ltr" name="${nm}" value="${esc(DL[k]||def)}"></label>`;
         return row('cut','חיתוך','nCut','Cut')+row('crease','קיפול','nCrease','Crease')+row('kiss','חיתוך נשיקה','nKiss','Kiss-cut')+row('marks','נקודות (מארקים)','nMarks','Regmarks')})()}</div>
       <p class="hint">מופיעות רק שכבות שיש בעבודה. מורידים סימון כדי לא לכלול שכבה בקובץ. הנקודות נכנסות כעיגולים בשכבה משלהן.</p></fieldset>
+    ${window.desk?`<fieldset class="exdirs"><legend>לאן לשמור</legend>${[['print','PDF להדפסה'],['cut','PDF לחיתוך'],['dxf','DXF']].map(([k,l])=>`<div class="deskrow exdir"><b>${l}</b><span class="mono small" dir="ltr" data-exdirlbl="${k}">…</span><input type="hidden" name="dir_${k}" value="${esc((ex.dirs||{})[k]||'')}"><button type="button" class="btn sm" data-exdir="${k}">שנה…</button></div>`).join('')}<p class="hint" style="margin:2px 0 0">התיקיות נשמרות גם בתצורת הייצוא.</p></fieldset>`:''}
     <label class="field">שם לקבצים כשאין מארק טקסט<input type="text" name="base" value="${esc(def)}"></label></div>`,
     [{v:'go',label:'ייצא',primary:true},{v:'no',label:'ביטול'}]);
   {const ov=[...document.querySelectorAll('.modal')].pop();const cust=ov.querySelector('.excustom');
+    if(window.desk){const lblDirs=async()=>{const c=await window.desk.getCfg();const dd={print:c.printDir,cut:c.cutDir,dxf:c.dxfDir||c.cutDir};for(const k of['print','cut','dxf']){const h=ov.querySelector(`[name="dir_${k}"]`),l=ov.querySelector(`[data-exdirlbl="${k}"]`);if(h&&l){const v=h.value||dd[k];l.textContent=v;l.title=v}}};ov._lblDirs=lblDirs;lblDirs();
+      ov.addEventListener('click',async e=>{const b=e.target.closest('[data-exdir]');if(!b)return;e.preventDefault();e.stopPropagation();const k=b.dataset.exdir;const h=ov.querySelector(`[name="dir_${k}"]`);const l=ov.querySelector(`[data-exdirlbl="${k}"]`);const p=await window.desk.pickFolder(h.value||l.textContent);if(p){h.value=p;lblDirs()}},true)}
     const F=n=>ov.querySelector(`[name="${n}"]`);const dx=ov.querySelector('.exdxf');
-    const getCfg=()=>({dxfOff:Object.fromEntries(['cut','crease','kiss','marks'].filter(k=>F('on_'+k)&&!F('on_'+k).checked).map(k=>[k,1])),print:F('print').checked,cut:F('cut').checked,cutfmt:F('cutfmt').value,which:(ov.querySelector('[name=which]:checked')||{}).value||'all',dxfL:{cut:F('nCut').value.trim(),crease:F('nCrease').value.trim(),kiss:F('nKiss').value.trim(),marks:F('nMarks').value.trim()}});
-    const setCfg=c=>{F('print').checked=c.print!==false;F('cut').checked=c.cut!==false;F('cutfmt').value=c.cutfmt||'pdf';const w=ov.querySelector(`[name=which][value="${c.which||'all'}"]`);if(w)w.checked=true;cust.hidden=(c.which||'all')!=='custom';const d=c.dxfL||{};F('nCut').value=d.cut||'Cut';F('nCrease').value=d.crease||'Crease';F('nKiss').value=d.kiss||'Kiss-cut';F('nMarks').value=d.marks||'Regmarks';for(const k of['cut','crease','kiss','marks'])if(F('on_'+k))F('on_'+k).checked=!(c.dxfOff||{})[k];dx.hidden=F('cutfmt').value==='pdf'};
+    const getDirs=()=>Object.fromEntries(['print','cut','dxf'].map(k=>[k,(ov.querySelector(`[name="dir_${k}"]`)||{}).value||'']).filter(x=>x[1]));
+    const getCfg=()=>({dirs:getDirs(),dxfOff:Object.fromEntries(['cut','crease','kiss','marks'].filter(k=>F('on_'+k)&&!F('on_'+k).checked).map(k=>[k,1])),print:F('print').checked,cut:F('cut').checked,cutfmt:F('cutfmt').value,which:(ov.querySelector('[name=which]:checked')||{}).value||'all',dxfL:{cut:F('nCut').value.trim(),crease:F('nCrease').value.trim(),kiss:F('nKiss').value.trim(),marks:F('nMarks').value.trim()}});
+    const setCfg=c=>{F('print').checked=c.print!==false;F('cut').checked=c.cut!==false;F('cutfmt').value=c.cutfmt||'pdf';const w=ov.querySelector(`[name=which][value="${c.which||'all'}"]`);if(w)w.checked=true;cust.hidden=(c.which||'all')!=='custom';const d=c.dxfL||{};F('nCut').value=d.cut||'Cut';F('nCrease').value=d.crease||'Crease';F('nKiss').value=d.kiss||'Kiss-cut';F('nMarks').value=d.marks||'Regmarks';for(const k of['cut','crease','kiss','marks'])if(F('on_'+k))F('on_'+k).checked=!(c.dxfOff||{})[k];dx.hidden=F('cutfmt').value==='pdf';for(const k of['print','cut','dxf']){const h=ov.querySelector(`[name="dir_${k}"]`);if(h)h.value=(c.dirs||{})[k]||''}if(ov._lblDirs)ov._lblDirs()};
     ov.addEventListener('change',e=>{if(e.target.name==='which')cust.hidden=e.target.value!=='custom';if(e.target.name==='cutfmt')dx.hidden=e.target.value==='pdf';
       if(e.target.name==='preset'){const p=PR.find(x=>x.id===e.target.value);if(p)setCfg(p);ov.querySelector('[data-exdel]').disabled=!p}});
     ov.addEventListener('click',e=>{const sv=e.target.closest('[data-exsave]'),dl2=e.target.closest('[data-exdel]');if(!sv&&!dl2)return;e.preventDefault();e.stopPropagation();const sel=F('preset');
@@ -3350,7 +3358,7 @@ $('#expBtn').addEventListener('click',async()=>{
   const r=await pr;
   if(r.v!=='go')return;const base=(r.vals.base||def).replace(/[\\/:*?"<>|]+/g,'-').trim()||'layout';
   const v=r.vals;S.cfg.dxfOff={};for(const k of['cut','crease','kiss','marks'])if(v['on_'+k]===false)S.cfg.dxfOff[k]=1;S.cfg.dxfL={cut:(v.nCut||'Cut').trim(),crease:(v.nCrease||'Crease').trim(),kiss:(v.nKiss||'Kiss-cut').trim(),marks:(v.nMarks||'Regmarks').trim()};
-  S.cfg.exp={print:!!v.print,cut:!!v.cut,cutfmt:v.cutfmt||'pdf',which:v.which||'all',preset:v.preset||''};saveSettings();
+  S.cfg.exp={print:!!v.print,cut:!!v.cut,cutfmt:v.cutfmt||'pdf',which:v.which||'all',preset:v.preset||'',dirs:Object.fromEntries(['print','cut','dxf'].map(k=>[k,v['dir_'+k]||'']).filter(x=>x[1]))};saveSettings();
   if(!v.print&&!v.cut){toast('לא נבחר קובץ לייצוא');return}
   const sheets=v.which==='cur'?[curSheet()].filter(Boolean):v.which==='custom'?S.sheets.filter((x,i)=>v['sh_'+i]):S.sheets.slice();if(!sheets.length){toast('לא נבחרו גיליונות לייצוא');return}
   const nameOf=sh=>sheetFileName(sh,base);const groups=sheets.map(sh=>({sheets:[sh],name:nameOf(sh)}));
@@ -3360,7 +3368,7 @@ $('#expBtn').addEventListener('click',async()=>{
   if(v.cut){if(fmt!=='dxf')for(const gp of groups){const ok=await exportPdf('cut',gp.name,true,Object.assign({collect:files},gp));if(ok===false)return}
     if(fmt!=='pdf'){const ok=await exportDxf(base,sheets,nameOf,files);if(ok===false)return}}
   if(!files.length)return;const dl=await getDL();if(!dl){toast('שמירת קבצים עובדת כשהעמוד פתוח בתוך Claude');return}
-  try{if(window.desk){const dirs=new Set();for(const f of files){const r=await window.desk.saveFile(f.name,f.bytes);if(r&&r.dir)dirs.add(r.dir)}toast(`נשמרו ${files.length} קבצים בתיקיות ${[...dirs].map(d=>d.split(/[\\/]/).pop()).join(' / ')}`)}
+  try{if(window.desk){const dirs=new Set();const want=n=>{const l=n.toLowerCase();const k=l.endsWith('.dxf')?'dxf':/_cut\b|_cut\./.test(l)?'cut':'print';return v['dir_'+k]||''};for(const f of files){const r=await window.desk.saveFile(f.name,f.bytes,null,want(f.name)||undefined);if(r&&r.dir)dirs.add(r.dir)}toast(`נשמרו ${files.length} קבצים בתיקיות ${[...dirs].map(d=>d.split(/[\\/]/).pop()).join(' / ')}`)}
     else if(files.length===1){const f=files[0];await dl.save({filename:f.name,data:new Blob([f.bytes])});toast(`${f.name} נשמר`)}
     else{busy(true,'אורז קבצים…');const zip=makeZip(files);busy(false);const zn=`${base}${v.which==='custom'?'_'+sheets.length+'-sheets':''}.zip`;await dl.save({filename:zn,data:zip});toast(`נשמר ${zn} · ${files.length} קבצים (${sheets.length} גיליונות)`)}}
   catch(err){busy(false);if(err&&err.code==='declined')toast('השמירה בוטלה');else toast('הייצוא נכשל: '+((err&&err.message)||err))}});
