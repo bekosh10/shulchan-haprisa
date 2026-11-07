@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="268">
+<meta name="app-version" content="269">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -3652,7 +3652,9 @@ function loadSamples(){
   mk('פוסטר אירוע',700,1000,'#c2571a','#ffffff',{qty:3,group:'B'});
   mk('מדבקה עגולה',300,300,'#2e8a6e','#ffffff',{qty:0,fill:true,group:'B'});
 }
-async function start(){await IDB.open();const had=await restoreSaved();
+async function start(){await IDB.open();
+  if(window.desk){jobId=newJobId();jobName='';jobPath='';$('#jobName').value='';booted=true;renderAll();updUndo();getDL();initLib();return}
+  const had=await restoreSaved();
   if(had){booted=true;renderAll();toast('העבודה האחרונה נטענה מהדפדפן')}
   else{jobId=newJobId();jobName='עבודת דוגמה';$('#jobName').value=jobName;loadSamples();renderAll();await autoNest();hist=[];fut=[];booted=true;updUndo()}
   getDL();initLib()}
