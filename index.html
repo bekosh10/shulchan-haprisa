@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="267">
+<meta name="app-version" content="268">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -1111,6 +1111,23 @@ function linePts(W,H,l){const o=+l.o||8;const pts=[];const S2=l.sides||{l:true,r
   if(S2.t)along(W,o,true);if(S2.b)along(W,H-o,true);if(S2.l)along(H,o,false);if(S2.r)along(H,W-o,false);return pts}
 function xdotsMK(sh,x){const base=mkOf(sh);return Object.assign({},base,{on:true},x.ov||{})}
 function sheetMarks(sh,W,H){if(sh.mk)return sh.mk;const M=mkOf(sh);const bb=artBox(sh);let pts=M.on?markPts(W,H,M,bb):[];for(const x of sh.xdots||[])pts=pts.concat(markPts(W,H,xdotsMK(sh,x),bb));for(const l of lineSets())if(lnOn(l,sh))pts=pts.concat(linePts(W,H,lnEff(l,sh)));return pts}
+/* duplex check plus: two thin K100 pluses printed on A and at the mirrored spot on B, so the press can notch and verify the flip */
+const DPLUS_A=5;
+function dplusFlip(x,y,W,H){return S.nest.flipAxis==='h'?[x,H-y]:[W-x,y]}
+function dplusPts(sh,W,H){if(!sh||!sheetBack(sh)||sh.dplusOff)return[];if(sh.dplus&&sh.dplus.length)return sh.dplus.map(q=>[q.x,q.y]);
+  const a=artBox(sh);const mL=a?a.x0:W/2,mR=a?W-a.x1:W/2,mT=a?a.y0:H/2,mB=a?H-a.y1:H/2;const need=DPLUS_A*2+2;
+  const MP=(mkOf(sh).on||(sh.xdots&&sh.xdots.length)||lineSets().some(l=>lnOn(l,sh)))?sheetMarks(sh,W,H):[];const clr=DPLUS_A+(mkOf(sh).d||5)+3;
+  const free=pts=>pts.every(([x,y])=>MP.every(([u,v])=>Math.hypot(u-x,v-y)>clr));const r=v=>Math.round(v*2)/2;
+  const horiz=Math.min(mL,mR)>=need||Math.min(mT,mB)<need;
+  const xl=Math.max(DPLUS_A+2,mL/2),xr=W-Math.max(DPLUS_A+2,mR/2),yt=Math.max(DPLUS_A+2,mT/2),yb=H-Math.max(DPLUS_A+2,mB/2);
+  for(const f of[0.5,0.4,0.6,0.3,0.7,0.2,0.8]){const pts=horiz?[[xl,H*f],[xr,H*f]]:[[W*f,yt],[W*f,yb]];if(free(pts))return pts.map(([x,y])=>[r(x),r(y)])}
+  return(horiz?[[xl,H/2],[xr,H/2]]:[[W/2,yt],[W/2,yb]]).map(([x,y])=>[r(x),r(y)])}
+function dplusBad(sh,W,H){const bad=new Set();dplusPts(sh,W,H).forEach(([x,y],i)=>{for(const p of sh.placements){if(!itemById(p.iid))continue;const f=foot(p);if(x+DPLUS_A>p.x&&x-DPLUS_A<p.x+f.fw&&y+DPLUS_A>p.y&&y-DPLUS_A<p.y+f.fh){bad.add(i);break}}});return bad}
+function dplusSVG(sh,W,H,side){const P=dplusPts(sh,W,H);if(!P.length)return'';const a=DPLUS_A;const bad=side==='A'?dplusBad(sh,W,H):new Set();
+  return P.map(([x0,y0],i)=>{const[x,y]=side==='B'?dplusFlip(x0,y0,W,H):[x0,y0];const c=bad.has(i)?'#d33':'#000';
+    return`<g class="dplus" style="pointer-events:none"><path d="M${r3(x-a)} ${r3(y)}H${r3(x+a)}M${r3(x)} ${r3(y-a)}V${r3(y+a)}" stroke="${c}" stroke-width="1.5" vector-effect="non-scaling-stroke" fill="none"/><text x="${r3(x+1.2)}" y="${r3(y-1.2)}" font-size="3" fill="${c}" font-family="Arial">${side}</text></g>${side==='A'?`<circle data-dpi="${i}" cx="${r3(x)}" cy="${r3(y)}" r="${a+1}" fill="transparent" style="cursor:move"><title>פלוס בדיקת דו־צדדי${bad.has(i)?' · עולה על הגרפיקה!':''} · גררי להזזה</title></circle>`:''}`}).join('')}
+function dplusPdf(page,sh,W,H,K,side){const L=PDFLib;const col=L.cmyk(0,0,0,1);const a=DPLUS_A;for(const[x0,y0]of dplusPts(sh,W,H)){const[x,y]=side==='B'?dplusFlip(x0,y0,W,H):[x0,y0];const Y=v=>(H-v)*K;
+  page.drawLine({start:{x:(x-a)*K,y:Y(y)},end:{x:(x+a)*K,y:Y(y)},thickness:0.35*K,color:col});page.drawLine({start:{x:x*K,y:Y(y-a)},end:{x:x*K,y:Y(y+a)},thickness:0.35*K,color:col})}}
 function markConflicts(sh){const{W,H}=sheetSize(sh);const bad=new Set();const MK=mkOf(sh);if(!MK.on&&!(sh.xdots&&sh.xdots.length)&&!lineSets().some(l=>lnOn(l,sh)))return bad;const r=MK.d/2+1;
   sheetMarks(sh,W,H).forEach(([x,y],i)=>{for(const p of sh.placements){const f=foot(p);const cx=Math.max(p.x,Math.min(x,p.x+f.fw)),cy=Math.max(p.y,Math.min(y,p.y+f.fh));if(Math.hypot(x-cx,y-cy)<r){bad.add(i);break}}
     if(!bad.has(i))for(const rc of sh.rects||[]){if(!(rc.fillOn||rc.strokeOn))continue;const g=rectGeom(sh,rc);const cx=Math.max(g.x,Math.min(x,g.x+g.w)),cy=Math.max(g.y,Math.min(y,g.y+g.h));if(Math.hypot(x-cx,y-cy)<r){bad.add(i);break}}});return bad}
@@ -1880,12 +1897,15 @@ function renderMarksMgr(){const T=textMarks();$('#markNames').innerHTML=`<div cl
 function renderMarksSummary(){const el=$('#marksSummary');if(!el)return;const sh=curSheet();if(!sh){el.innerHTML='<p class="hint">אין גיליון פתוח.</p>';return}
   const P=dotPresets();const M=mkOf(sh);const dp=sh.dotsPid||((subOf(mediaOf(sh))||{}).dots)||'';const dName=dp==='none'||!M.on?null:((P.find(p=>p.id===dp)||defDots()||activeDots()||{}).name||'נקודות');
   const T=textMarks();const on=T.filter(t=>tmOn(t,sh));const off=T.filter(t=>!tmOn(t,sh));
-  const selK=S.shMkSel||'';const key=(kind,id)=>kind==='dots'?'dots':kind==='x'?'x:'+id:kind==='ln'?'ln:'+id:id;const row=(kind,id,name,sub)=>`<div class="mkrow ${key(kind,id)===selK?'on':''}" data-shsel="${key(kind,id)}"><span class="mav" style="background:${kind==='tm'?'#8b3fd9':kind==='ln'?'#c2410c':'#d33'};width:24px;height:24px;font-size:10px">${kind==='tm'?'T':kind==='ln'?'⋮':'●'}</span><span class="mnm" style="flex:1"><b>${esc(name)}</b>${sub?`<small dir="auto">${esc(sub)}</small>`:''}</span>${true?`<button class="icon-btn" data-shm="dup" data-kind="${kind}" data-id="${id}" title="שכפל בגיליון הזה" aria-label="שכפל"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>`:''}<button class="icon-btn" data-shm="rm" data-kind="${kind}" data-id="${id}" title="הסר מהגיליון" aria-label="הסר">✕</button><span class="mkchev" aria-hidden="true">${key(kind,id)===selK?'▴':'▾'}</span></div>${key(kind,id)===selK?DET:''}`;
+  const selK=S.shMkSel||'';const key=(kind,id)=>kind==='dots'?'dots':kind==='x'?'x:'+id:kind==='ln'?'ln:'+id:id;const row=(kind,id,name,sub)=>`<div class="mkrow ${key(kind,id)===selK?'on':''}" data-shsel="${key(kind,id)}"><span class="mav" style="background:${kind==='tm'?'#8b3fd9':kind==='ln'?'#c2410c':kind==='dp'?'#222':'#d33'};width:24px;height:24px;font-size:${kind==='dp'?14:10}px">${kind==='tm'?'T':kind==='ln'?'⋮':kind==='dp'?'+':'●'}</span><span class="mnm" style="flex:1"><b>${esc(name)}</b>${sub?`<small dir="auto">${esc(sub)}</small>`:''}</span>${kind!=='dp'?`<button class="icon-btn" data-shm="dup" data-kind="${kind}" data-id="${id}" title="שכפל בגיליון הזה" aria-label="שכפל"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>`:''}<button class="icon-btn" data-shm="rm" data-kind="${kind}" data-id="${id}" title="הסר מהגיליון" aria-label="הסר">✕</button><span class="mkchev" aria-hidden="true">${key(kind,id)===selK?'▴':'▾'}</span></div>${key(kind,id)===selK?DET:''}`;
   const DET=(()=>{const xsel=selK.startsWith('x:')?(sh.xdots||[]).find(x=>'x:'+x.id===selK):null;if((selK==='dots'&&dName)||xsel){const ov=xsel?(xsel.ov||{}):(sh.dotsOv||{});const MM=xsel?xdotsMK(sh,xsel):M;const v=k=>ov[k]!==undefined?ov[k]:MM[k];return`<div class="mkdet"><div class="row"><b style="flex:1">${esc(xsel?(xsel.name||'נקודות נוספות'):dName)} · בגיליון הזה</b><button class="btn sm" data-shm="refresh" title="מחזיר את כל הנקודות למקום לפי ההגדרות, כולל נקודות שנמחקו">רענן</button>${sh.dotsOv?'<button class="btn sm" data-shm="reset">איפוס</button>':''}</div>
       <div class="kv"><label>קוטר (ס״מ)</label><input data-cm type="number" step="0.5" data-ov="d" value="${v('d')}"><label>מרחק מהקצה (ס״מ)</label><input data-cm type="number" step="0.5" data-ov="o" value="${v('o')}">
       <label>נקודה חמישית</label><input type="checkbox" class="chk" data-ov="fifth" ${v('fifth')!==false?'checked':''}><label>מרחק החמישית (ס״מ)</label><input data-cm type="number" step="1" data-ov="f" value="${v('f')}">
       <label>כיוון החמישית</label><select data-ov="dir"><option value="h" ${v('dir')!=='v'?'selected':''}>אופקי</option><option value="v" ${v('dir')==='v'?'selected':''}>אנכי</option></select>
       <label>מרווח לעבודה (ס״מ)</label><input data-cm type="number" step="1" data-ov="clear" value="${v('clear')}"></div></div>`}
+      if(selK==='dplus'&&sheetBack(sh)&&!sh.dplusOff){const{W,H}=sheetSize(sh);const P=dplusPts(sh,W,H);return`<div class="mkdet"><div class="row"><b style="flex:1">בדיקת דו־צדדי · בגיליון הזה</b><button class="btn sm" data-shm="refresh" title="מחזיר את הפלוסים למיקום האוטומטי">רענן</button></div>
+      <div class="small muted">פלוס בצד A ופלוס חופף בדיוק בצד B. נכנס רק לקובץ ההדפסה. אפשר לגרור על הגיליון.</div>
+      <div class="kv">${P.map(([x,y],i)=>`<label>פלוס ${i+1} X (ס״מ)</label><input data-cm type="number" step="0.5" data-dpx="${i}" value="${x}"><label>פלוס ${i+1} Y (ס״מ)</label><input data-cm type="number" step="0.5" data-dpy="${i}" value="${y}">`).join('')}</div></div>`}
       const lsel=selK.startsWith('ln:')?lineSets().find(l=>'ln:'+l.id===selK):null;if(lsel){const l=lnEff(lsel,sh);const sd=l.sides||{};return`<div class="mkdet"><div class="row"><b style="flex:1">${esc(lsel.name||'נקודות אורך')} · בגיליון הזה</b><button class="btn sm" data-shm="refresh">רענן</button>${sh.lnOv&&sh.lnOv[lsel.id]?'<button class="btn sm" data-shm="reset">איפוס</button>':''}</div>
       <div class="kv"><label>חלוקה</label><select data-ovl="mode"><option value="dist" ${l.mode!=='count'?'selected':''}>לפי מרחק</option><option value="count" ${l.mode==='count'?'selected':''}>לפי כמות</option></select>
       ${l.mode==='count'?`<label>נקודות לכל צד</label><input type="number" min="0" step="1" data-ovl="n" value="${l.n|0}">`:`<label>מרחק מקסימלי (ס״מ)</label><input data-cm type="number" min="10" step="10" data-ovl="dist" value="${l.dist||500}">`}
@@ -1899,10 +1919,10 @@ function renderMarksSummary(){const el=$('#marksSummary');if(!el)return;const sh
       <label>גודל (pt)</label><input type="number" min="4" step="1" data-ovt="size" value="${t.size||12}"><label>צבע</label><input type="color" data-ovt="color" value="${t.color||'#000000'}"></div>
       <div class="tmhead"><span class="small"><b>טקסט</b></span>${kwPlus('sh')}</div><textarea data-ovt="text" rows="2" dir="auto" style="width:100%">${esc(t.text||'')}</textarea><div class="small muted">יוצא: <b dir="auto">${esc(expandKw(t.text,sh))}</b></div></div>`}return''})();
   el.innerHTML=`<div class="bulkbox"><b>מארקים בגיליון ${S.cur+1}</b>
-    ${dName?row('dots','',dName,'נקודות חיתוך'):''}${(sh.xdots||[]).map(x=>row('x',x.id,x.name||'נקודות נוספות','נקודות חיתוך נוספות')).join('')}${lineSets().filter(l=>lnOn(l,sh)).map(l=>row('ln',l.id,l.name||'נקודות אורך',l.mode==='count'?`${l.n|0} נקודות לצד`:`כל ${fmt((+l.dist||500)/10)} ס״מ`)).join('')}${on.map(t=>row('tm',t.id,t.name||'מארק טקסט',expandKw(t.text,sh))).join('')}
-    ${!dName&&!on.length?'<div class="small muted">אין מארקים בגיליון הזה</div>':''}
+    ${dName?row('dots','',dName,'נקודות חיתוך'):''}${(sh.xdots||[]).map(x=>row('x',x.id,x.name||'נקודות נוספות','נקודות חיתוך נוספות')).join('')}${lineSets().filter(l=>lnOn(l,sh)).map(l=>row('ln',l.id,l.name||'נקודות אורך',l.mode==='count'?`${l.n|0} נקודות לצד`:`כל ${fmt((+l.dist||500)/10)} ס״מ`)).join('')}${on.map(t=>row('tm',t.id,t.name||'מארק טקסט',expandKw(t.text,sh))).join('')}${sheetBack(sh)&&!sh.dplusOff?row('dp','dplus','בדיקת דו־צדדי','פלוס חופף A/B · רק בהדפסה'):''}
+    ${!dName&&!on.length&&!(sheetBack(sh)&&!sh.dplusOff)?'<div class="small muted">אין מארקים בגיליון הזה</div>':''}
 
-    <select data-shm="add"><option value="">+ הוספת מארק…</option>${P.length?`<optgroup label="נקודות חיתוך (מחליף את הקיים)">${P.map(p=>`<option value="d:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>`:''}${lineSets().filter(l=>!lnOn(l,sh)).length?`<optgroup label="נקודות אורך">${lineSets().filter(l=>!lnOn(l,sh)).map(l=>`<option value="l:${l.id}">${esc(l.name||'נקודות אורך')}</option>`).join('')}</optgroup>`:''}${off.length?`<optgroup label="מארקי טקסט">${off.map(t=>`<option value="t:${t.id}">${esc(t.name||'מארק טקסט')}</option>`).join('')}</optgroup>`:''}</select>
+    <select data-shm="add"><option value="">+ הוספת מארק…</option>${P.length?`<optgroup label="נקודות חיתוך (מחליף את הקיים)">${P.map(p=>`<option value="d:${p.id}">${esc(p.name)}</option>`).join('')}</optgroup>`:''}${lineSets().filter(l=>!lnOn(l,sh)).length?`<optgroup label="נקודות אורך">${lineSets().filter(l=>!lnOn(l,sh)).map(l=>`<option value="l:${l.id}">${esc(l.name||'נקודות אורך')}</option>`).join('')}</optgroup>`:''}${sheetBack(sh)&&sh.dplusOff?`<optgroup label="דו־צדדי"><option value="p:dplus">בדיקת דו־צדדי (פלוס)</option></optgroup>`:''}${off.length?`<optgroup label="מארקי טקסט">${off.map(t=>`<option value="t:${t.id}">${esc(t.name||'מארק טקסט')}</option>`).join('')}</optgroup>`:''}</select>
     <div class="row"><button class="btn sm" data-shm="refreshAll" title="מעדכן את כל המארקים בגיליון לפי ההגדרות">רענן מארקים</button><button class="btn sm" data-shm="all">החל על כל הגיליונות</button></div></div>`}
 const openMarks=()=>{renderMarksMgr();$('#marksMgr').hidden=false};const closeMarks=()=>{$('#marksMgr').hidden=true;saveSettings();renderAll();setTimeout(warnMarks,50)};
 $('#marksBtn').addEventListener('click',openMarks);$('#marksMgrX').addEventListener('click',closeMarks);$('#marksMgrOk').addEventListener('click',closeMarks);
@@ -1911,22 +1931,23 @@ $('#marksSummary').addEventListener('change',e=>{const sh=curSheet();if(!sh)retu
   if(t.dataset.ov){snap();const k=t.dataset.ov;const val=t.type==='checkbox'?t.checked:t.tagName==='SELECT'?t.value:Math.max(0,parseFloat(t.value)||0);const xs=(S.shMkSel||'').startsWith('x:')?(sh.xdots||[]).find(x=>'x:'+x.id===S.shMkSel):null;if(xs)xs.ov=Object.assign({},xs.ov||{},{[k]:val});else sh.dotsOv=Object.assign({},sh.dotsOv||{},{[k]:val});delete sh.mk;renderAll();return}
   if(t.dataset.ovl||t.dataset.ovlside){snap();const id=(S.shMkSel||'').slice(3);sh.lnOv=Object.assign({},sh.lnOv||{});const cur=Object.assign({},sh.lnOv[id]||{});const base=lnEff(lineSets().find(l=>l.id===id)||{},sh);
     if(t.dataset.ovlside)cur.sides=Object.assign({},base.sides||{},{[t.dataset.ovlside]:t.checked});else{const k=t.dataset.ovl;cur[k]=k==='mode'?t.value:Math.max(0,parseFloat(t.value)||0)}sh.lnOv[id]=cur;delete sh.mk;renderAll();return}
+  if(t.dataset.dpx||t.dataset.dpy){snap();const{W,H}=sheetSize(sh);sh.dplus=dplusPts(sh,W,H).map(([x,y])=>({x,y}));const i=+(t.dataset.dpx||t.dataset.dpy);const v=Math.max(0,parseFloat(t.value)||0);if(sh.dplus[i]){if(t.dataset.dpx)sh.dplus[i].x=Math.min(W,v);else sh.dplus[i].y=Math.min(H,v)}renderAll();return}
   if(t.dataset.ovt){snap();const k=t.dataset.ovt;const id=S.shMkSel;sh.tmOv=Object.assign({},sh.tmOv||{});sh.tmOv[id]=Object.assign({},sh.tmOv[id]||{},{[k]:['dx','dy','size'].includes(k)?(parseFloat(t.value)||0):t.value});renderAll();return}
   const k=t.dataset.shm;if(k!=='add'||!t.value)return;snap();const v=e.target.value;
-  if(v.startsWith('l:')){sh.lnOn=Object.assign({},sh.lnOn||{},{[v.slice(2)]:true});delete sh.mk}else if(v.startsWith('d:')){sh.dotsPid=v.slice(2);delete sh.mk}else if(v.startsWith('t:'))sh.tmOn=Object.assign({},sh.tmOn||{},{[v.slice(2)]:true});renderAll()});
+  if(v.startsWith('l:')){sh.lnOn=Object.assign({},sh.lnOn||{},{[v.slice(2)]:true});delete sh.mk}else if(v.startsWith('d:')){sh.dotsPid=v.slice(2);delete sh.mk}else if(v==='p:dplus'){delete sh.dplusOff;delete sh.dplus;S.shMkSel='dplus'}else if(v.startsWith('t:'))sh.tmOn=Object.assign({},sh.tmOn||{},{[v.slice(2)]:true});renderAll()});
 $('#marksSummary').addEventListener('click',e=>{const sh=curSheet();if(!sh)return;const kp=e.target.closest('[data-kwplus]');if(kp){const ta=$('#marksSummary textarea[data-ovt=text]');openKwMenu(kp,ta,nv=>{snap();const id=S.shMkSel;sh.tmOv=Object.assign({},sh.tmOv||{});sh.tmOv[id]=Object.assign({},sh.tmOv[id]||{},{text:nv});renderAll()});return}if(e.target.closest('.kwmenu'))return;const b=e.target.closest('[data-shm]');
   if(!b){const r=e.target.closest('[data-shsel]');if(r&&!e.target.closest('input,select,textarea')){S.shMkSel=S.shMkSel===r.dataset.shsel?'':r.dataset.shsel;renderMarksSummary()}return}
   if(b.tagName==='SELECT')return;snap();
   if(b.dataset.shm==='reset'){if((S.shMkSel||'').startsWith('ln:')){if(sh.lnOv)delete sh.lnOv[S.shMkSel.slice(3)];delete sh.mk}else if((S.shMkSel||'').startsWith('x:')){const xs=(sh.xdots||[]).find(x=>'x:'+x.id===S.shMkSel);if(xs)xs.ov={};delete sh.mk}else if(S.shMkSel==='dots'){delete sh.dotsOv;delete sh.mk}else if(sh.tmOv)delete sh.tmOv[S.shMkSel];renderAll();return}
-  if(b.dataset.shm==='refresh'){if(S.shMkSel==='dots'||/^(x|ln):/.test(S.shMkSel||''))delete sh.mk;else if(sh.tmOv&&sh.tmOv[S.shMkSel]){const o=Object.assign({},sh.tmOv[S.shMkSel]);delete o.pos;delete o.dx;delete o.dy;sh.tmOv[S.shMkSel]=o}renderAll();toast('המארק עודכן');return}
-  if(b.dataset.shm==='refreshAll'){delete sh.mk;if(sh.tmOv)for(const k of Object.keys(sh.tmOv)){const o=Object.assign({},sh.tmOv[k]);delete o.pos;delete o.dx;delete o.dy;sh.tmOv[k]=o}renderAll();toast('כל המארקים בגיליון עודכנו');return}
+  if(b.dataset.shm==='refresh'){if(S.shMkSel==='dplus')delete sh.dplus;else if(S.shMkSel==='dots'||/^(x|ln):/.test(S.shMkSel||''))delete sh.mk;else if(sh.tmOv&&sh.tmOv[S.shMkSel]){const o=Object.assign({},sh.tmOv[S.shMkSel]);delete o.pos;delete o.dx;delete o.dy;sh.tmOv[S.shMkSel]=o}renderAll();toast('המארק עודכן');return}
+  if(b.dataset.shm==='refreshAll'){delete sh.mk;delete sh.dplus;if(sh.tmOv)for(const k of Object.keys(sh.tmOv)){const o=Object.assign({},sh.tmOv[k]);delete o.pos;delete o.dx;delete o.dy;sh.tmOv[k]=o}renderAll();toast('כל המארקים בגיליון עודכנו');return}
   if(b.dataset.shm==='dup'&&b.dataset.kind==='ln'){const src=lineSets().find(l=>l.id===b.dataset.id);if(src){const id=nid('ln');lineSets().push(Object.assign(JSON.parse(JSON.stringify(src)),{id,name:(src.name||'נקודות אורך')+' עותק',on:false,o:(+src.o||8)+(+src.d||6)*2}));sh.lnOn=Object.assign({},sh.lnOn||{},{[id]:true});delete sh.mk;saveSettings()}renderAll();return}
   if(b.dataset.shm==='dup'&&b.dataset.kind!=='tm'){const M=mkOf(sh);const srcOv=b.dataset.kind==='x'?((sh.xdots||[]).find(x=>x.id===b.dataset.id)||{}).ov:sh.dotsOv;const base=Object.assign({},M,srcOv||{});const id=nid('xd');
       sh.xdots=(sh.xdots||[]).concat([{id,name:((activeDots()||{}).name||'נקודות')+' עותק',ov:{d:base.d,o:(+base.o||12)+(+base.d||5)*3,f:base.f,dir:base.dir,clear:base.clear,fifth:base.fifth,dist:base.dist}}]);delete sh.mk;S.shMkSel='x:'+id;renderAll();toast('נוסף סט נקודות נוסף בגיליון הזה. שני ערכים כדי למקם אותו');return}
   if(b.dataset.shm==='dup'){const src=textMarks().find(t=>t.id===b.dataset.id);if(src){const eff=tmEff(src,sh);const id=nid('tm');const{W,H}=sheetSize(sh);const g=tmGeom(eff,W,H);
       textMarks().push(Object.assign(JSON.parse(JSON.stringify(src)),{id,name:(src.name||'מארק טקסט')+' עותק',on:false}));sh.tmOn=Object.assign({},sh.tmOn||{},{[id]:true});
       sh.tmOv=Object.assign({},sh.tmOv||{});sh.tmOv[id]=Object.assign({},(sh.tmOv&&sh.tmOv[src.id])||{},{dy:(+eff.dy||0)+g.sz*1.6});S.shMkSel=id;saveSettings();toast('המארק שוכפל בגיליון הזה. אפשר לגרור אותו או לשנות לו ערכים')}renderAll();return}
-  if(b.dataset.shm==='rm'){if(b.dataset.kind==='ln'){sh.lnOn=Object.assign({},sh.lnOn||{},{[b.dataset.id]:false});delete sh.mk}else if(b.dataset.kind==='x'){sh.xdots=(sh.xdots||[]).filter(x=>x.id!==b.dataset.id);delete sh.mk}else if(b.dataset.kind==='dots'){sh.dotsPid='none';delete sh.mk}else sh.tmOn=Object.assign({},sh.tmOn||{},{[b.dataset.id]:false})}
+  if(b.dataset.shm==='rm'){if(b.dataset.kind==='dp'){sh.dplusOff=true;delete sh.dplus}else if(b.dataset.kind==='ln'){sh.lnOn=Object.assign({},sh.lnOn||{},{[b.dataset.id]:false});delete sh.mk}else if(b.dataset.kind==='x'){sh.xdots=(sh.xdots||[]).filter(x=>x.id!==b.dataset.id);delete sh.mk}else if(b.dataset.kind==='dots'){sh.dotsPid='none';delete sh.mk}else sh.tmOn=Object.assign({},sh.tmOn||{},{[b.dataset.id]:false})}
   else if(b.dataset.shm==='all'){for(const x of S.sheets){if(x===sh)continue;x.dotsPid=sh.dotsPid||null;x.tmOn=sh.tmOn?Object.assign({},sh.tmOn):undefined;x.dotsOv=sh.dotsOv?Object.assign({},sh.dotsOv):undefined;x.xdots=sh.xdots?JSON.parse(JSON.stringify(sh.xdots)):undefined;x.lnOn=sh.lnOn?Object.assign({},sh.lnOn):undefined;x.lnOv=sh.lnOv?JSON.parse(JSON.stringify(sh.lnOv)):undefined;x.tmOv=sh.tmOv?JSON.parse(JSON.stringify(sh.tmOv)):undefined;delete x.mk}toast('המארקים הוחלו על כל הגיליונות')}
   renderAll()});
 $('#marksMgr').addEventListener('change',e=>{const t=e.target;if(t.dataset.scope!=='sub')return;e.stopPropagation();setScope(t.dataset.kind,mkSel,t.dataset.sub,t.checked);for(const sh of S.sheets)delete sh.mk;saveSettings();renderMarksMgr();renderStage()},true);
@@ -2427,7 +2448,7 @@ function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;co
     ghost=`<g opacity="${ga}" style="pointer-events:none">`+sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const M=cmp(Fs,pmat(it,p));
       return`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`}).join('')+`</g>`+
       sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!(c.spot&&S.spotHide[c.spot])).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
-  svg.innerHTML=`<defs>${defs}${ghostDefs}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${pls}${ghost}`;
+  svg.innerHTML=`<defs>${defs}${ghostDefs}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${pls}${ghost}${dplusSVG(sh,W,H,'B')}`;
   $('#ghostR').value=S.side==='B'?100-(S.ghostA??40):(S.ghostA??40);$('#ghostV').textContent=(S.ghostA??40)+'%';$('#status').innerHTML=`<b>צד B</b> · תצוגת מראה (הגיליון מתהפך סביב ${S.nest.flipAxis==='h'?'ציר אופקי':'ציר אנכי'}) · לעריכה חזרי לצד A${missing?` · <span class="bad">${missing} פריטים בלי צד B</span>`:''}`;
   $('#ftb').hidden=true;renderToolbar();updZoomUI()}
 if(!S.spotHide)S.spotHide={};
@@ -2549,7 +2570,7 @@ function renderStage(){
     ghostB=`<g opacity="${gaA}" style="pointer-events:none">`+sh.placements.map(p=>{const it=itemById(p.iid);if(!it||!it.back)return'';const b=box(it);
       const Fl=S.nest.flipAxis==='h'?[1,0,0,-1,0,b.PH]:[-1,0,0,1,b.PW,0];const M=cmp(pmat(it,p),Fl);
       return`<use href="#art-${it.id}_b" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`}).join('')+`</g>`}
-  svg.innerHTML=`<defs>${defs}${netClips}${ghostBDefs}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${rectsSVG(sh,'back')}${artBleed}${artNet}${ghostB}<rect class="area" x="${r3(Q4.l)}" y="${r3(Q4.t)}" width="${r3(m.w-Q4.l-Q4.r)}" height="${r3(areaH)}"/>${pls}${rectsSVG(sh,'front')}${grps}${mk}${mkText}${over}${rectsHit(sh)}`;
+  svg.innerHTML=`<defs>${defs}${netClips}${ghostBDefs}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${rectsSVG(sh,'back')}${artBleed}${artNet}${ghostB}<rect class="area" x="${r3(Q4.l)}" y="${r3(Q4.t)}" width="${r3(m.w-Q4.l-Q4.r)}" height="${r3(areaH)}"/>${pls}${rectsSVG(sh,'front')}${grps}${mk}${mkText}${dplusSVG(sh,W,H,'A')}${over}${rectsHit(sh)}`;
   let art=0;for(const p of sh.placements){const it=itemById(p.iid);if(it){const b=box(it);const cc=isShape(it)?closedCuts(it):[];art+=cc.length?Math.min(b.netW*b.netH,Math.max(...cc.map(c=>Math.abs(polyArea(c.pts))))*it.sx*it.sy):b.netW*b.netH}}
   const util=areaH>0?art/((m.w-Q4.l-Q4.r)*areaH)*100:0;
   $('#status').innerHTML=`${esc(m.name)} · <b class="mono" dir="ltr" style="unicode-bidi:isolate" title="רוחב × ${m.type==='roll'?'אורך':'גובה'}">${fmt(W/10)} × ${fmt(H/10)}</b> ס״מ`;
@@ -2677,6 +2698,7 @@ svg.addEventListener('pointerdown',e=>{
   try{svg.setPointerCapture(e.pointerId)}catch(_){}
   const mh=e.target.closest('[data-mi]');
   if(mh){const{W,H}=sheetSize(sh);drag={mode:'mark',mi:+mh.dataset.mi,snap:snapshot(),moved:false};sh.mk=sheetMarks(sh,W,H).map(a=>a.slice());return}
+  const dpEl=e.target.closest('[data-dpi]');if(dpEl){const{W,H}=sheetSize(sh);drag={mode:'dplus',i:+dpEl.dataset.dpi,snap:snapshot(),moved:false};sh.dplus=dplusPts(sh,W,H).map(([x,y])=>({x,y}));S.shMkSel='dplus';return}
   const tmEl=e.target.closest('[data-tmid]');if(tmEl){const{W,H}=sheetSize(sh);const b=tmBoxes(sh,W,H).find(x=>x.id===tmEl.dataset.tmid);if(b){const t0=textMarks().find(t=>t.id===b.id);const sz=tmGeom(tmEff(t0,sh),W,H).sz;const g0=tmGeom(tmEff(t0,sh),W,H);drag={mode:'tmark',id:b.id,snap:snapshot(),moved:false,ox:pt.x-g0.x,oy:pt.y-g0.yb,sz,al:g0.al};S.shMkSel=b.id;return}}
   if(e.target.closest('[data-rot]')){const ps=movable();if(!ps.length)return;const bb=bboxOf(ps);const c={x:bb.x+bb.w/2,y:bb.y+bb.h/2};
     drag={mode:'rot',snap:snapshot(),c,a0:Math.atan2(pt.y-c.y,pt.x-c.x),orig:new Map(ps.map(p=>[p.pid,{x:p.x,y:p.y,rot:p.rot||0}])),ps,delta:0,moved:false};renderStage();return}
@@ -2735,14 +2757,15 @@ svg.addEventListener('pointermove',e=>{
     if(drag.mode==='rmove'){const w=x1-x0,h=y1-y0;x0=Math.max(0,Math.min(SW-w,x0));y0=Math.max(0,Math.min(SH-h,y0));x1=x0+w;y1=y0+h}
     else{x0=Math.max(0,Math.min(SW,x0));x1=Math.max(0,Math.min(SW,x1));y0=Math.max(0,Math.min(SH,y0));y1=Math.max(0,Math.min(SH,y1))}
     r.x=Math.min(x0,x1);r.y=Math.min(y0,y1);r.w=Math.max(1,Math.abs(x1-x0));r.h=Math.max(1,Math.abs(y1-y0));reqStage()}
+  else if(drag.mode==='dplus'){drag.moved=true;const{W,H}=sheetSize(sh);sh.dplus[drag.i]={x:Math.max(0,Math.min(W,Math.round(pt.x*2)/2)),y:Math.max(0,Math.min(H,Math.round(pt.y*2)/2))};reqStage()}
   else if(drag.mode==='mark'){drag.moved=true;sh.mk[drag.mi]=[Math.round(pt.x*2)/2,Math.round(pt.y*2)/2];reqStage()}
   else if(drag.mode==='tmark'){drag.moved=true;const ax=Math.round((pt.x-drag.ox)*2)/2,ay=Math.round((pt.y-drag.oy)*2)/2;sh.tmOv=Object.assign({},sh.tmOv||{});sh.tmOv[drag.id]=Object.assign({},sh.tmOv[drag.id]||{},{pos:'tl',dx:ax,dy:Math.round((ay-drag.sz*0.8)*100)/100,align:drag.al});reqStage()}
   else if(drag.mode==='rot'){let d=(Math.atan2(pt.y-drag.c.y,pt.x-drag.c.x)-drag.a0)*180/Math.PI;d=((d+540)%360)-180;
     if(e.shiftKey)d=Math.round(d/45)*45;else{d=Math.round(d);const m45=Math.round(d/45)*45;if(Math.abs(d-m45)<=3)d=m45}
     drag.moved=true;drag.delta=d;rotateAround(drag.ps,drag.orig,d,drag.c);reqStage()}
 });
-function endDrag(){if(!drag)return;const sh=curSheet();const d=drag;const changed=(d.mode==='move'||d.mode==='mark'||d.mode==='rot'||d.mode==='tmark'||d.mode==='rmove'||d.mode==='rsize')&&d.moved;drag=null;if((d.mode==='rmove'||d.mode==='rsize')&&d.moved)renderShapes();
-  if(d.mode==='mark'&&!d.moved){S.mkSelI=d.mi;renderStage();toast('נקודה נבחרה. Delete מוחק אותה, "החזר סימנים" מחזיר את כולן')}else if(d.mode!=='mark')S.mkSelI=null;if(d.mode==='tmark')renderSettings();
+function endDrag(){if(!drag)return;const sh=curSheet();const d=drag;const changed=(d.mode==='move'||d.mode==='dplus'||d.mode==='mark'||d.mode==='rot'||d.mode==='tmark'||d.mode==='rmove'||d.mode==='rsize')&&d.moved;drag=null;if((d.mode==='rmove'||d.mode==='rsize')&&d.moved)renderShapes();
+  if(d.mode==='mark'&&!d.moved){S.mkSelI=d.mi;renderStage();toast('נקודה נבחרה. Delete מוחק אותה, "החזר סימנים" מחזיר את כולן')}else if(d.mode!=='mark')S.mkSelI=null;if(d.mode==='tmark'||d.mode==='dplus')renderSettings();
   if(changed&&sh&&anyMarkConflict(sh))toast((d.mode==='rmove'||d.mode==='rsize')&&markConflicts(sh).size?'⚠ אסור צבע מתחת לנקודות החיתוך: המלבן נוגע בנקודה (מסומנת באדום). הזיזי או הקטיני אותו.':'שימי לב: יש מארק שנמצא על הגרפיקה או נוגע בה (מסומן באדום). אי אפשר לשמור PDF עד שתזיזי אותו.');
   if(changed){hist.push(d.snap);if(hist.length>100)hist.shift();fut=[];if(sh)sh.manual=true;renderThumbs();renderStrip();renderProps();scheduleSave()}
   if(d.mode==='box'){if(!S.sel.size)S.isel.clear();syncIsel();renderItems();renderProps();renderStrip()}
@@ -3270,11 +3293,12 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
       if(kind==='print')drawRectsPdf(pg,sh,'front',H,K);
       {const MK=mkOf(sh);if(MK.on||(sh.xdots&&sh.xdots.length)||lineSets().some(l=>lnOn(l,sh)))for(const[cx,cy]of sheetMarks(sh,W,H))pg.drawCircle({x:cx*K,y:(H-cy)*K,size:MK.d/2*K,color:rgb(0,0,0)})}
       if(kind==='print')await drawTextMarks(out,pg,sh,W,H,K);
+      if(kind==='print')dplusPdf(pg,sh,W,H,K,'A');
       if(kind==='print'&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back})){backPages++;const pb=out.addPage([W*K,H*K]);
         for(const p of sh.placements){const it=itemById(p.iid);if(!it||!it.back)continue;const bp=backProxy(it);const b=box(it);const M=backMat(it,p,W,H);const e=await embedFor(bp);
           const key=PDFName.of('Lx'+(++xc));pb.node.setXObject(key,e.obj.ref);const P=(u,v)=>{const q=ap(M,u,v);return[q[0]*K,(H-q[1])*K]};
           const mat=artMat(e,bp,b,P);
-          pb.pushOperators(L.pushGraphicsState(),...(e.full?boxClip(b,P):[]),L.concatTransformationMatrix(...mat),L.drawObject(key),L.popGraphicsState())}}}
+          pb.pushOperators(L.pushGraphicsState(),...(e.full?boxClip(b,P):[]),L.concatTransformationMatrix(...mat),L.drawObject(key),L.popGraphicsState())}dplusPdf(pb,sh,W,H,K,'B');}}
     const bytes=await out.save();busy(false);
     const fname=`${base||'layout'}${opts.suffix||''}_${kind}.pdf`;
     if(opts.collect){opts.collect.push({name:fname,bytes:new Uint8Array(bytes)});return true}
