@@ -15,6 +15,7 @@ jobs:
         with: { node-version: 20 }
       - name: Package
         shell: bash
+        env: { ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/' }
         run: |
           npm i --no-save @electron/packager@18
           npx electron-packager desktop "Shulchan Haprisa" --platform=win32 --arch=x64 --electron-version=33.2.1 --out=out --overwrite --icon=desktop/icon.ico --ignore="icon\.icns" --app-version=1.0.3 --win32metadata.ProductName="Shulchan Haprisa" --win32metadata.FileDescription="Shulchan Haprisa"
