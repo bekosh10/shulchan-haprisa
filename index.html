@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="273">
+<meta name="app-version" content="275">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -1148,6 +1148,8 @@ function offsetPoly(P,d){const n=P.length;if(n<3||!d)return P;const s=polyArea(P
 function cleanPts(pts,closed){const o=[];for(const p of pts){const q=o[o.length-1];if(!q||Math.hypot(p[0]-q[0],p[1]-q[1])>0.02)o.push(p)}
   if(closed&&o.length>2){const a=o[0],b=o[o.length-1];if(Math.hypot(a[0]-b[0],a[1]-b[1])<0.05)o.pop()}return o}
 function cutBBox(it){let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const c of it.contours||[])if(ctype(c)==='cut')for(const[x,y]of c.pts){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)}return{x0,y0,x1,y1}}
+/* cut / kiss-cut lines that do not close: the gap between their two ends, mm */
+function openCuts(it){return(it.contours||[]).filter(c=>{const t=ctype(c);return(t==='cut'||t==='kiss')&&!c.closed&&c.pts&&c.pts.length>1}).map(c=>{const a=c.pts[0],b=c.pts[c.pts.length-1];return{c,gap:Math.hypot(a[0]-b[0],a[1]-b[1])}})}
 function closedCuts(it){return(it.contours||[]).filter(c=>ctype(c)==='cut'&&c.closed&&c.pts.length>2)}
 
 /* ---------- packing ---------- */
@@ -1601,7 +1603,8 @@ function classify(names){const norm=s=>String(s).toLowerCase().replace(/[\s_\-]/
 const CUT_ROLES=['cut','kiss','crease'];
 function wordRole(n){const c=classify([n]);if(c)return c;const norm=s=>String(s).toLowerCase().replace(/[\s_\-]/g,'');const has=k=>(S.cfg[k]||'').split(',').map(norm).filter(Boolean).includes(norm(n));return has('cmykNames')?'cmyk':has('keepSpotNames')?'ignore':null}
 function nameRole(n){return S.spotMap[n]||wordRole(n)}
-const ROLE_LBL={cut:'Cut · חיתוך (צורה)',kiss:'Kiss-cut · חיתוך נשיקה',crease:'Crease · קיפול',ignore:'ספוט בהדפסה (להשאיר כספוט)',cmyk:'להמיר ל-CMYK בהדפסה'};
+const ROLE_LBL={cut:'Cut · חיתוך (צורה)',kiss:'Kiss-cut · חיתוך נשיקה',crease:'Crease · קיפול',ignore:'ספוט בהדפסה (להשאיר כספוט)',cmyk:'להמיר ל-CMYK בהדפסה',delete:'למחוק (לא בהדפסה ולא בחיתוך)'};
+function spotOff(n){return!!n&&(S.spotHide&&S.spotHide[n]||S.spotMap[n]==='delete')}
 function contoursFrom(raw){const out=[];const groups=new Map();
   for(const p of raw.paths){let closed=p.closed;const pts=p.pts;if(!closed&&pts.length>2){const a=pts[0],b=pts[pts.length-1];if(Math.hypot(a[0]-b[0],a[1]-b[1])<0.6)closed=true}
     const c=cleanPts(pts,closed);if(c.length<2)continue;const e={type:classify(p.spots),spot:p.spots[0],mode:p.mode,closed:closed&&c.length>2,pts:c};
@@ -1735,7 +1738,7 @@ async function addFiles(list){
 const pdfjsCache={},pdflibCache={};
 /* preview with hidden spots: a copy of the page where everything painted in a hidden spot is made transparent (preview only, never exported) */
 const hidThumbs={},hidBusy=new Set();
-function hidNames(it){if(!it||it.kind!=='pdf'||!it.fid||it.artThumb||!S.files[it.fid])return[];const all=new Set([...(it.spots||[]),...(it.textSpots||[]),...(it.contours||[]).map(c=>c.spot).filter(Boolean)]);return[...all].filter(n=>S.spotHide&&S.spotHide[n]).sort()}
+function hidNames(it){if(!it||it.kind!=='pdf'||!it.fid||it.artThumb||!S.files[it.fid])return[];const all=new Set([...(it.spots||[]),...(it.textSpots||[]),...(it.contours||[]).map(c=>c.spot).filter(Boolean)]);return[...all].filter(spotOff).sort()}
 function artSrc(it){const base=it.artThumb||it.thumb;const hn=hidNames(it);if(!hn.length)return base;const key=it.fid+':'+it.page+':'+hn.join('|');
   if(hidThumbs[key])return hidThumbs[key];if(!hidBusy.has(key)){hidBusy.add(key);hiddenThumb(it,hn).then(u=>{if(u){hidThumbs[key]=u;reqStage()}}).catch(()=>{}).finally(()=>hidBusy.delete(key))}return base}
 async function hiddenThumb(it,names){const L=PDFLib;const f=S.files[it.fid];const doc=await L.PDFDocument.load(f.bytes.slice(),{ignoreEncryption:true,updateMetadata:false});
@@ -2324,7 +2327,7 @@ function propsHTML(T){let html='';
       :`<span class="small muted" style="flex:1">ס״מ · לפי כיוון העמוד (ראש / רגל)</span></div><div class="spgrid">${['למעלה','ימין','למטה','שמאל'].map((n,k)=>`<label class="spf"><span>${n}</span><input type="number" step="0.1" min="0" data-cm data-p="ss${k}" value="${fmt(spaceSides(it)[k])}"></label>`).join('')}</div>`}${spUnlocked(it)?'':'</div>'}</section>
     <section class="psec"><div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חלוקה</h4><div class="grid3" style="flex:1;min-width:0">${orient(it.orient||'auto')}${grp(it.group)}<select data-p="cols" id="p-cols" title="כמה עמודות. השורות לפי הכמות">${[0,1,2,3,4,5,6,7,8,9,10,12,15,20].map(n=>`<option value="${n}" ${(+it.cols||0)===n?'selected':''}>${n?`${n} עמודות`:'עמודות'}</option>`).join('')}</select></div></div></section>
     ${hasCut(it)?`<section class="psec">
-      <div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חיתוך</h4><span class="small muted" style="flex:1">${(it.contours||[]).some(c=>ctype(c)==='crease')?'קו חיתוך וקיפול':'קו חיתוך'} · ${cutGroups(it).length} צורות</span>${it.cutMode==='shape'?`<label class="fillchk vchk" title="${hasCut(it)?'מסגרת חיתוך מלבנית מסביב לבלוק':'מסגרת חיתוך מלבנית (בקובץ החיתוך)'}"><input type="checkbox" data-p="frame" ${it.frame?'checked':''}><span>מסגרת</span></label>`:''}${isShape(it)?`<label class="fillchk vchk" title="סידור קבוע לגאמפרים: אחד עומד ואחד הפוך ב-180°, משתלבים אחד בתוך השני. המרחק בין החלקים לפי &quot;מרווחים&quot;"><input type="checkbox" data-p="jmp" ${it.jmp?'checked':''}><span>גאמפר</span></label>`:''}</div>
+      <div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חיתוך</h4><span class="small muted" style="flex:1">${(it.contours||[]).some(c=>ctype(c)==='crease')?'קו חיתוך וקיפול':'קו חיתוך'} · ${cutGroups(it).length} צורות${openCuts(it).length?` · <b style="color:var(--cut,#d33)">⚠ הקו לא סגור (פתח ${fmt(Math.round(Math.max(...openCuts(it).map(o=>o.gap))*10)/10)} מ״מ)</b>`:''}</span>${it.cutMode==='shape'?`<label class="fillchk vchk" title="${hasCut(it)?'מסגרת חיתוך מלבנית מסביב לבלוק':'מסגרת חיתוך מלבנית (בקובץ החיתוך)'}"><input type="checkbox" data-p="frame" ${it.frame?'checked':''}><span>מסגרת</span></label>`:''}${isShape(it)?`<label class="fillchk vchk" title="סידור קבוע לגאמפרים: אחד עומד ואחד הפוך ב-180°, משתלבים אחד בתוך השני. המרחק בין החלקים לפי &quot;מרווחים&quot;"><input type="checkbox" data-p="jmp" ${it.jmp?'checked':''}><span>גאמפר</span></label>`:''}</div>
         <select data-p="mode" id="p-mode" title="סידור"><option value="shape" ${it.cutMode==='shape'?'selected':''}>סידור: לפי צורת החיתוך</option><option value="rect" ${it.cutMode!=='shape'?'selected':''}>סידור: כמלבן (להתעלם מהקו)</option></select>
         ${it.cutMode==='shape'&&cutGroups(it).length>1?'<button class="btn sm" data-pa="split">פרק לחלקים נפרדים</button>':''}</section>`:(()=>{const cs=(it.contours||[]).map(ctype).filter(Boolean);if(!cs.length)return'';const nk=cs.filter(t=>t==='kiss').length,nc=cs.filter(t=>t==='crease').length;
       return`<section class="psec"><div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חיתוך</h4><span class="small muted" style="flex:1">${[nk?`${nk} קווי חיתוך נשיקה`:'',nc?`${nc} קווי קיפול`:''].filter(Boolean).join(' · ')} · נכנסים לקובץ החיתוך</span><label class="fillchk vchk" title="מסגרת חיתוך מלבנית מסביב לעמוד"><input type="checkbox" data-p="frame" ${it.frame!==false?'checked':''}><span>מסגרת</span></label></div></section>`})()}
@@ -2463,7 +2466,7 @@ function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;co
   if(ga>0){ghostDefs=used.map(symbolFor).join('');
     ghost=`<g opacity="${ga}" style="pointer-events:none">`+sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const M=cmp(Fs,pmat(it,p));
       return`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`}).join('')+`</g>`+
-      sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!(c.spot&&S.spotHide[c.spot])).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
+      sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
   svg.innerHTML=`<defs>${defs}${ghostDefs}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${pls}${ghost}${dplusSVG(sh,W,H,'B')}`;
   $('#ghostR').value=S.side==='B'?100-(S.ghostA??40):(S.ghostA??40);$('#ghostV').textContent=(S.ghostA??40)+'%';$('#status').innerHTML=`<b>צד B</b> · תצוגת מראה (הגיליון מתהפך סביב ${S.nest.flipAxis==='h'?'ציר אופקי':'ציר אנכי'}) · לעריכה חזרי לצד A${missing?` · <span class="bad">${missing} פריטים בלי צד B</span>`:''}`;
   $('#ftb').hidden=true;renderToolbar();updZoomUI()}
@@ -2507,13 +2510,14 @@ function missingDots(sh){const M=mkOf(sh);if(!M.on)return['אין נקודות �
   const R5=Math.max((+M.f||50)*2.5,R);const has5=pts.some(([x,y],i)=>!used.has(i)&&Math.hypot(x-W,y-H)<=R5+M.o*2);if(!has5)miss.push('נקודה חמישית');return miss}
 function outOfArea(sh){const a=viewArea(sh);const roll=mediaOf(sh).type==='roll';const A=areaOf(sh);const bad=new Set();for(const p of sh.placements){const f=foot(p);if(p.x<a.x-0.5||p.y<a.y-0.5||p.x+f.fw>a.x+a.w+0.5||(!roll&&p.y+f.fh>a.y+a.h+0.5)||(roll&&p.y+f.fh>(sh.len>0?a.y+a.h:A.y+A.h)+0.5))bad.add(p.pid)}return bad}
 /* user alert rules (settings): warn only, never block */
-function alertCfg(){const d={dots5:true,lw:{on:true,w:160,h:180},ll:{on:true,h:295},spot:true};const c=S.cfg.alerts=Object.assign({},d,S.cfg.alerts||{});c.lw=Object.assign({},d.lw,c.lw||{});c.ll=Object.assign({},d.ll,c.ll||{});return c}
+function alertCfg(){const d={dots5:true,lw:{on:true,w:160,h:180},ll:{on:true,h:295},spot:true,open:true};const c=S.cfg.alerts=Object.assign({},d,S.cfg.alerts||{});c.lw=Object.assign({},d.lw,c.lw||{});c.ll=Object.assign({},d.ll,c.ll||{});return c}
 function graphicSpots(sh){const out=new Map();for(const p of sh.placements){const it=itemById(p.iid);if(!it)continue;for(const n of it.spots||[]){if(/^(all|none)$/i.test(n))continue;const role=nameRole(n);if(role&&role!=='ignore')continue;if(!out.has(n))out.set(n,new Set());out.get(n).add(it.name||'')}}return out}
 function alertIssues(sh){const A=alertCfg();const out=[];const{W,H}=sheetSize(sh);const M=mkOf(sh);
   if(A.dots5){const pts=M.on?sheetMarks(sh,W,H):[];if(!M.on||M.fifth===false||pts.length<5)out.push('אין בגיליון 5 נקודות חיתוך')}
   const hasLine=lineSets().some(l=>lnOn(l,sh))||(M.on&&+M.dist>0);
   if(!hasLine){if(A.lw.on&&W>(+A.lw.w||0)*10&&H>(+A.lw.h||0)*10)out.push(`הגיליון ${fmt(W/10)}×${fmt(H/10)} ס״מ (רחב מ-${A.lw.w} וארוך מ-${A.lw.h}) בלי נקודות אורך`);
     else if(A.ll.on&&H>(+A.ll.h||0)*10)out.push(`הגיליון ארוך מ-${A.ll.h} ס״מ (${fmt(H/10)}) בלי נקודות אורך`)}
+  if(A.open){const bad=[...new Set(sh.placements.map(p=>p.iid))].map(itemById).filter(it=>it&&openCuts(it).length);if(bad.length)out.push(`קו חיתוך לא סגור: ${bad.slice(0,4).map(it=>{const g=Math.max(...openCuts(it).map(o=>o.gap));return`${it.name||''} (פתח ${fmt(Math.round(g*10)/10)} מ״מ)`}).join(' · ')}${bad.length>4?' ועוד '+(bad.length-4):''}`)}
   if(A.spot){const sp=graphicSpots(sh);if(sp.size)out.push(`יש צבע ספוט בגרפיקה: ${[...sp.entries()].map(([n,its])=>`${n} (${[...its].slice(0,3).join(', ')})`).join(' · ')}`)}
   return out}
 function sheetIssues(sh){const out=[];{const md=missingDots(sh);if(md.length)out.push(md[0].startsWith('אין')?md[0]:(md.length>1?'חסרות ':'חסרה ')+md.join(', '))}const b=conflicts(sh).size,m=markConflicts(sh).size,t=textConflicts(sh).size;if(m)out.push(m===1?'נקודת חיתוך נוגעת בגרפיקה':m+' נקודות חיתוך נוגעות בגרפיקה');if(t)out.push(t===1?'מארק טקסט עולה על הגרפיקה':t+' מארקי טקסט עולים על הגרפיקה');if(b){const o=outOfArea(sh).size;if(o)out.push(o===1?'עותק אחד מחוץ לשטח העבודה':o+' עותקים מחוץ לשטח העבודה');if(b-o>0)out.push((b-o)+' עותקים חופפים')}for(const a of alertIssues(sh))if(!out.includes(a))out.push(a);return out}
@@ -2556,7 +2560,7 @@ function renderStage(){
     const art='';if(!S.wire){const u=`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`;artBleed+=u;
       netClips+=`<clipPath id="nc-${p.pid}" clipPathUnits="userSpaceOnUse">${bleedCell(sh,p).map(P=>`<path d="${dPts(P,true)}"/>`).join('')}</clipPath>`;artNet+=`<g clip-path="url(#nc-${p.pid})">${u}</g>`}
     const wf=S.wire==='lines'?` style="fill:transparent;stroke:none"`:S.wire?` style="fill:${it.color};fill-opacity:.62"`:'';
-    const lines=paths.filter(c=>!(c.spot&&S.spotHide[c.spot])).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')+(it.frame===false&&!shapeMode(it)?`<path class="nofr" d="${dPts(net,true)}"/>`:'');
+    const lines=paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')+(it.frame===false&&!shapeMode(it)?`<path class="nofr" d="${dPts(net,true)}"/>`:'');
     let label='';if(S.wire===true){const fs=Math.max(px(7),Math.min(f.fw,f.fh)*0.075);const cx=p.x+f.fw/2,cy=p.y+f.fh/2;const per=Math.max(4,Math.floor(f.fw*0.86/(fs*0.56)));
       const words=it.name.split(/(\s+|_|-)/).filter(Boolean);const L=[];let cur='';for(const w of words){if((cur+w).length>per&&cur.trim()){L.push(cur.trim());cur=w.trim()?w:''}else cur+=w;while(cur.length>per){L.push(cur.slice(0,per));cur=cur.slice(per)}}if(cur.trim())L.push(cur.trim());
       const maxL=Math.max(1,Math.floor(f.fh*0.8/(fs*1.25)));let lines2=L.slice(0,maxL);if(L.length>maxL)lines2[maxL-1]=lines2[maxL-1].slice(0,Math.max(1,per-1))+'…';
@@ -2669,7 +2673,7 @@ function renderStrip(){
   for(const it of shIt)for(const c of it.contours||[]){if(!c.spot||/^(all|none)$/i.test(c.spot))continue;const e=ent(c.spot,c);e.n++;e.items.add(it.id)}
   for(const it of shIt)for(const nm of it.textSpots||[]){if(/^(all|none)$/i.test(nm))continue;const e=ent(nm);e.text=(e.text||0)+1;e.items.add(it.id)}
   for(const it of shIt)for(const nm of it.spots||[]){if(/^(all|none)$/i.test(nm))continue;const e=ent(nm);e.gfx=true;e.items.add(it.id)}
-  const ROLE={cut:[S.cfg.outCut||'Cut','חיתוך','var(--cut)'],crease:[S.cfg.outCrease||'Crease','קיפול','var(--crease)'],kiss:[S.cfg.outKiss||'Kiss-cut','חיתוך נשיקה','var(--kiss)'],ignore:['','ספוט בהדפסה','#9aa3ad'],cmyk:['','להמיר ל-CMYK','#2b8a9e']};
+  const ROLE={cut:[S.cfg.outCut||'Cut','חיתוך','var(--cut)'],crease:[S.cfg.outCrease||'Crease','קיפול','var(--crease)'],kiss:[S.cfg.outKiss||'Kiss-cut','חיתוך נשיקה','var(--kiss)'],ignore:['','ספוט בהדפסה','#9aa3ad'],cmyk:['','להמיר ל-CMYK','#2b8a9e'],delete:['','למחוק','#555']};
   const spTabs=`<div class="seg sptabs"><button data-sptab="sheet" aria-pressed="${spTab==='sheet'}">בגיליון</button><button data-sptab="page" aria-pressed="${spTab==='page'}" ${focusIt?'':'disabled title="בחרי עמוד כדי לראות את הספוטים שלו"'}>בעמוד</button></div>`;
   const spotHTML=`<div class="spot-h"><span>ספוטים ${spTab==='page'?'בעמוד':'בגיליון'} <span class="small muted" style="font-weight:400">${spots.size}</span></span><label class="small" style="font-weight:400;display:flex;align-items:center;gap:5px;cursor:pointer" title="להסתיר את הגרפיקה ולראות רק את קווי החיתוך"><input type="checkbox" data-cutonly ${S.wire==='lines'?'checked':''}>רק קווי חיתוך</label></div>`+spTabs+(spots.size?[...spots].map(([name,e])=>{const role=nameRole(name)||(CUT_ROLES.includes(e.c.type)?e.c.type:'ignore');const col=ROLE[role]?ROLE[role][2]:'var(--line)';
       return`<div class="spotrow"><input type="checkbox" class="spv" data-spotvis="${esc(name)}" ${S.spotHide[name]?'':'checked'} title="הצג בפריסה" aria-label="הצג את ${esc(name)} בפריסה"><span class="sw" style="background:${col}"></span><span class="sn" title="${esc(name)}">${esc(name)}</span>
@@ -3226,11 +3230,12 @@ $('#setBtn').addEventListener('click',async()=>{
       <label class="chk"><input type="checkbox" name="al_dots5" ${A.dots5?'checked':''}> אין בגיליון 5 נקודות חיתוך</label>
       <label class="chk alrow"><input type="checkbox" name="al_lw" ${A.lw.on?'checked':''}> גיליון רחב מ-<input type="number" name="al_lw_w" min="1" step="1" value="${A.lw.w}"> ס״מ וגם ארוך מ-<input type="number" name="al_lw_h" min="1" step="1" value="${A.lw.h}"> ס״מ, בלי נקודות אורך</label>
       <label class="chk alrow"><input type="checkbox" name="al_ll" ${A.ll.on?'checked':''}> גיליון ארוך מ-<input type="number" name="al_ll_h" min="1" step="1" value="${A.ll.h}"> ס״מ, בלי נקודות אורך</label>
-      <label class="chk"><input type="checkbox" name="al_spot" ${A.spot?'checked':''}> יש צבע ספוט בגרפיקה (לא חיתוך, קיפול או Kiss-cut)</label></fieldset>`})()}
+      <label class="chk"><input type="checkbox" name="al_spot" ${A.spot?'checked':''}> יש צבע ספוט בגרפיקה (לא חיתוך, קיפול או Kiss-cut)</label>
+      <label class="chk"><input type="checkbox" name="al_open" ${A.open?'checked':''}> קו חיתוך או Kiss-cut לא סגור</label></fieldset>`})()}
     <fieldset class="alertset"><legend>העברת הגדרות</legend><p class="hint" style="margin-top:0">כל החומרים, המדיות, המארקים, המיפויים וחוקי ההתראה בקובץ אחד – כדי להעביר לתוכנה במחשב או למחשב אחר.</p>
       <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-deskact="exportCfg">ייצוא הגדרות לקובץ</button><button type="button" class="btn sm" data-deskact="importCfg">ייבוא הגדרות מקובץ…</button></div></fieldset>
     ${window.desk?`<fieldset class="alertset" id="deskSet"><legend>תיקיות ועדכונים</legend><div class="small muted">טוען…</div></fieldset>`:''}</div>`,[{v:'ok',label:'שמור',primary:true},{v:'no',label:'ביטול'}]);
-  if(r.v!=='ok')return;{const A=alertCfg(),v=r.vals,nv=(x,d)=>{const n=parseFloat(x);return n>0?n:d};A.dots5=!!v.al_dots5;A.lw={on:!!v.al_lw,w:nv(v.al_lw_w,160),h:nv(v.al_lw_h,180)};A.ll={on:!!v.al_ll,h:nv(v.al_ll_h,295)};A.spot=!!v.al_spot}
+  if(r.v!=='ok')return;{const A=alertCfg(),v=r.vals,nv=(x,d)=>{const n=parseFloat(x);return n>0?n:d};A.dots5=!!v.al_dots5;A.lw={on:!!v.al_lw,w:nv(v.al_lw_w,160),h:nv(v.al_lw_h,180)};A.ll={on:!!v.al_ll,h:nv(v.al_ll_h,295)};A.spot=!!v.al_spot;A.open=!!v.al_open}
   snap();const b=Math.max(0,parseFloat(r.vals.defBleed)||0),g=Math.max(0,parseFloat(r.vals.gap)||0);S.nest.defBleed=b;S.nest.gap=g;S.nest.cutGap=Math.max(0,parseFloat(r.vals.cutGap)||0);
   saveSettings();renderAll();toast('ההגדרות נשמרו')});
 $('#newJob').addEventListener('click',async()=>{await flushSave();jobId=newJobId();jobName='';S.spotMap={};$('#jobName').value='';S.items=[];S.sheets=[];S.cur=0;S.sel.clear();S.isel.clear();hist=[];fut=[];renderAll();$('#jobName').focus();toast('עבודה חדשה נפתחה. העבודה הקודמת נשמרה ב"העבודות שלי".')});
@@ -3274,8 +3279,8 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
     const boxClip=(b,P)=>{const pts=[[0,0],[b.PW,0],[b.PW,b.PH],[0,b.PH]].map(([u,v])=>P(u,v));return[...pts.map((q,i)=>i?L.lineTo(q[0],q[1]):L.moveTo(q[0],q[1])),L.closePath(),L.clip(),L.endPath()]};
     const embedFor=async it=>{if(emb[it.id])return emb[it.id];const[t,,,l]=it.trim;const b=box(it);let e;
       if(it.kind==='pdf'){if(!S.files[it.fid])throw new Error(`הקובץ של "${it.name}"${it.id.endsWith('_b')?' (צד B)':''} לא נמצא. העלי אותו שוב דרך "החלף".`);const sd=src[it.fid]||(src[it.fid]=await PDFDocument.load(S.files[it.fid].bytes,{ignoreEncryption:true}));
-        const pg=sd.getPage(it.page);if(kind==='print'&&!S.cfg.spotInPrint){const sk=it.fid+':'+it.page;if(!stripped.has(sk)){stripped.add(sk);try{stripSpotStrokes(L,sd,pg,names=>{for(const nm of names){const m=S.spotMap[nm];if(m)return CUT_ROLES.includes(m)}return!!classify(names)})}catch(e){}}}
-          if(kind==='print'){const ck='c:'+it.fid+':'+it.page;if(!stripped.has(ck)){stripped.add(ck);try{const cr=convertSpots(L,sd,pg,nm=>nameRole(nm)==='cmyk');if(cr.skipped.length)(window.__cmykSkip=window.__cmykSkip||new Set()).add(...cr.skipped)}catch(e){}}}const cb=pg.getCropBox();const left=cb.x+(l-b.bl/it.sx)*K,top=cb.y+cb.height-(t-b.bt/it.sy)*K;
+        const pg=sd.getPage(it.page);if(kind==='print'&&!S.cfg.spotInPrint){const sk=it.fid+':'+it.page;if(!stripped.has(sk)){stripped.add(sk);try{stripSpotStrokes(L,sd,pg,names=>{for(const nm of names){const m=S.spotMap[nm];if(m)return CUT_ROLES.includes(m)||m==='delete'}return!!classify(names)})}catch(e){}}}
+          if(kind==='print'){const ck='c:'+it.fid+':'+it.page;if(!stripped.has(ck)){stripped.add(ck);try{const del=new Set(Object.keys(S.spotMap).filter(n=>S.spotMap[n]==='delete'));const cr=convertSpots(L,sd,pg,nm=>nameRole(nm)==='cmyk',del.size?del:null);if(cr.skipped.length)(window.__cmykSkip=window.__cmykSkip||new Set()).add(...cr.skipped)}catch(e){}}}const cb=pg.getCropBox();const left=cb.x+(l-b.bl/it.sx)*K,top=cb.y+cb.height-(t-b.bt/it.sy)*K;
         e={form:true,obj:await out.embedPage(pg,{left,bottom:top-b.PH/it.sy*K,right:left+b.PW/it.sx*K,top})}}
       else if(it.kind==='img'&&/^data:image\/(png|jpeg);base64,/.test(it.src)){const isPng=/^data:image\/png/.test(it.src);const bytes=b64(it.src);e={form:false,full:true,obj:isPng?await out.embedPng(bytes):await out.embedJpg(bytes)}}
       else{const{bytes,mime}=await rasterFor(it);e={form:false,obj:mime==='image/png'?await out.embedPng(bytes):await out.embedJpg(bytes)}}
