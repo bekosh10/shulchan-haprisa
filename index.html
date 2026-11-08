@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="271">
+<meta name="app-version" content="272">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -572,6 +572,7 @@ input[type=number]{width:78px;text-align:left;direction:ltr;font-family:var(--f-
         <span class="posbox" id="posBox" title="מיקום הבחירה ביחס לפינה השמאלית העליונה של הגיליון"><label>X<input data-cm type="number" step="0.1" id="posX" disabled></label><label>Y<input data-cm type="number" step="0.1" id="posY" disabled></label><span class="poswh" id="posWH" hidden></span></span>
         <button class="btn sm" id="rotSheetBtn" title="מסובב את כל הגיליון ב-90° יחד עם התוכן (עומד ↔ שוכב)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-inline-end:4px"><rect x="3" y="9" width="11" height="12" rx="1.5"/><path d="M10 3h7a3 3 0 0 1 3 3v6"/><path d="M17.5 9.5 20 12l2.5-2.5"/></svg>סובב גיליון</button>
         <button class="btn sm wirebtn" id="wireBtn" aria-pressed="false" title="להסתיר את הגרפיקה ולראות רק מסגרות צבעוניות עם שם הקובץ"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1" style="fill:currentColor;fill-opacity:.85"/><rect x="13" y="3" width="8" height="8" rx="1" style="fill:currentColor;fill-opacity:.35"/><rect x="3" y="13" width="8" height="8" rx="1" style="fill:currentColor;fill-opacity:.6"/><rect x="13" y="13" width="8" height="8" rx="1" style="fill:#e4e6e8;stroke:#c9cdd1"/></svg>מסגרות</button>
+        <button class="btn sm wirebtn" id="cutOnlyBtn" aria-pressed="false" title="להסתיר את הגרפיקה ולראות רק את קווי החיתוך"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7c3-5 8 3 11-1s5 2 5 6-4 9-8 8-10-3-8-13z" style="fill:none;stroke:#E6007E;stroke-width:2"/></svg>רק קווי חיתוך</button>
       </div>
       <div class="canvasbox"><div class="sidesw" id="sidesw" hidden role="group" aria-label="צד מוצג"><button data-side="A" aria-pressed="true">צד A</button><button data-side="B" aria-pressed="false">צד B</button><span class="ghost" id="ghostBox" hidden title="גוררים לכיוון הצד שרוצים לראות יותר"><span id="ghostLbl" hidden></span><b class="gend">צד A</b><input type="range" id="ghostR" min="0" max="100" step="5" value="40" aria-label="כמה רואים מכל צד: ימינה צד A, שמאלה צד B"><b class="gend">צד B</b><span id="ghostV" hidden></span></span></div>
       <canvas id="rulerH" class="ruler" aria-hidden="true"></canvas><canvas id="rulerV" class="ruler" aria-hidden="true"></canvas><span class="rcorner" id="rulerC" aria-hidden="true">ס״מ</span><span class="rval" id="rulerXv" hidden></span><span class="rval" id="rulerYv" hidden></span>
@@ -1009,7 +1010,7 @@ const S={fileOpen:{},
 };
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');
   if(s){if(Array.isArray(s.media)&&s.media.length)S.media=s.media;if(Array.isArray(s.subs))S.subs=s.subs;if(s.active)S.active=s.active;
-    for(const k of['marks','nest','cfg'])if(s[k])Object.assign(S[k],s[k]);if(s.dpi)S.dpi=s.dpi;if(s.unit)S.unit=s.unit;if(typeof s.wire==='boolean')S.wire=s.wire}
+    for(const k of['marks','nest','cfg'])if(s[k])Object.assign(S[k],s[k]);if(s.dpi)S.dpi=s.dpi;if(s.unit)S.unit=s.unit;if(typeof s.wire==='boolean'||s.wire==='lines')S.wire=s.wire}
 }catch(e){}
 if(!S.nest.gapV2){S.nest.gap=0;S.nest.gapV2=1}if(S.nest.defBleed==null)S.nest.defBleed=3;
 if(!S.media.some(m=>m.id===S.active))S.active=S.media[0].id;
@@ -2377,7 +2378,7 @@ function renderSettings(){renderMarksSummary();renderShapes();
     <rect x="${ins}" y="${ins}" width="${W-2*ins}" height="${H-2*ins}" fill="none" stroke="var(--area)" stroke-dasharray="4 4"/>
     ${S.marks.on?markPts(W,H).map(([x,y])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#000"/>`).join(''):''}
     <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#5a656d" font-family="Google Sans, Noto Sans Hebrew, Arial">שטח עבודה</text></svg>`;
-  $('#wireBtn').setAttribute('aria-pressed',S.wire);
+  $('#wireBtn').setAttribute('aria-pressed',S.wire===true);$('#cutOnlyBtn').setAttribute('aria-pressed',S.wire==='lines');
 }
 
 function renderThumbs(){
@@ -2555,9 +2556,9 @@ function renderStage(){
     const hitD=shape&&closed.length?closed.map(c=>dPts(c.pts,true)).join(''):dPts(shape?[[p.x,p.y],[p.x+f.fw,p.y],[p.x+f.fw,p.y+f.fh],[p.x,p.y+f.fh]]:[[p.x,p.y],[p.x+f.fw,p.y],[p.x+f.fw,p.y+f.fh],[p.x,p.y+f.fh]],true);
     const art='';if(!S.wire){const u=`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`;artBleed+=u;
       netClips+=`<clipPath id="nc-${p.pid}" clipPathUnits="userSpaceOnUse">${bleedCell(sh,p).map(P=>`<path d="${dPts(P,true)}"/>`).join('')}</clipPath>`;artNet+=`<g clip-path="url(#nc-${p.pid})">${u}</g>`}
-    const wf=S.wire?` style="fill:${it.color};fill-opacity:.62"`:'';
+    const wf=S.wire==='lines'?` style="fill:transparent;stroke:none"`:S.wire?` style="fill:${it.color};fill-opacity:.62"`:'';
     const lines=paths.filter(c=>!(c.spot&&S.spotHide[c.spot])).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')+(it.frame===false&&!shapeMode(it)?`<path class="nofr" d="${dPts(net,true)}"/>`:'');
-    let label='';if(S.wire){const fs=Math.max(px(7),Math.min(f.fw,f.fh)*0.075);const cx=p.x+f.fw/2,cy=p.y+f.fh/2;const per=Math.max(4,Math.floor(f.fw*0.86/(fs*0.56)));
+    let label='';if(S.wire===true){const fs=Math.max(px(7),Math.min(f.fw,f.fh)*0.075);const cx=p.x+f.fw/2,cy=p.y+f.fh/2;const per=Math.max(4,Math.floor(f.fw*0.86/(fs*0.56)));
       const words=it.name.split(/(\s+|_|-)/).filter(Boolean);const L=[];let cur='';for(const w of words){if((cur+w).length>per&&cur.trim()){L.push(cur.trim());cur=w.trim()?w:''}else cur+=w;while(cur.length>per){L.push(cur.slice(0,per));cur=cur.slice(per)}}if(cur.trim())L.push(cur.trim());
       const maxL=Math.max(1,Math.floor(f.fh*0.8/(fs*1.25)));let lines2=L.slice(0,maxL);if(L.length>maxL)lines2[maxL-1]=lines2[maxL-1].slice(0,Math.max(1,per-1))+'…';
       const y0=cy-(lines2.length-1)*fs*1.25/2+fs*0.35;
@@ -3017,7 +3018,8 @@ $('#fillHere').addEventListener('click',fillCurrent);
 $('#lockBtn').addEventListener('click',()=>{const sh=curSheet();if(!sh)return;snap();sh.manual=!sh.manual;renderThumbs();toast(sh.manual?'הגיליון נעול ויישמר בסידור הבא':'הגיליון ישוחרר ויסודר מחדש בסידור הבא')});
 $('#resetMarks').addEventListener('click',()=>{const sh=curSheet();if(!sh||!sh.mk)return;snap();delete sh.mk;renderAll()});
 $('#rotSheetBtn').addEventListener('click',rotateSheet);
-$('#wireBtn').addEventListener('click',()=>{S.wire=!S.wire;saveSettings();renderSettings();renderStage()});
+$('#wireBtn').addEventListener('click',()=>{S.wire=S.wire===true?false:true;saveSettings();renderSettings();renderStage()});
+$('#cutOnlyBtn').addEventListener('click',()=>{S.wire=S.wire==='lines'?false:'lines';saveSettings();renderSettings();renderStage()});
 $('#zoomR').addEventListener('input',e=>{S.zoom=Math.exp(+e.target.value);renderStage()});
 
 /* zoom to area */
