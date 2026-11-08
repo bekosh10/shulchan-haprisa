@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="269">
+<meta name="app-version" content="270">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -848,7 +848,7 @@ function pdfFnEval(L,ctx,fo,ins){const lk=o=>o instanceof L.PDFRef?ctx.lookup(o)
         case'if':{const pr=b(),c=b();if(c)run(pr);break}case'ifelse':{const p2=b(),p1=b(),c=b();run(c?p1:p2);break}default:throw new Error('ps op '+t)}}};
     run(body);const n=rng?rng.length/2:st.length;return outClip(st.slice(st.length-n).map(Number))}
   return null}
-function convertSpots(L,doc,page,shouldConvert){
+function convertSpots(L,doc,page,shouldConvert,hide){
   const ctx=doc.context;const N=n=>L.PDFName.of(n);const lk=o=>o instanceof L.PDFRef?ctx.lookup(o):o;
   const bytesOf=o=>{o=lk(o);if(!o)return new Uint8Array(0);
     if(o instanceof L.PDFArray){const parts=[];let n=0;for(let i=0;i<o.size();i++){const b=bytesOf(o.get(i));parts.push(b);n+=b.length+1}const r=new Uint8Array(n);let off=0;for(const b of parts){r.set(b,off);off+=b.length;r[off++]=10}return r}
@@ -859,12 +859,13 @@ function convertSpots(L,doc,page,shouldConvert){
   const altOf=a=>{a=lk(a);if(a instanceof L.PDFArray){const k=pdfName(lk(a.get(0)));if(k==='ICCBased'){const st=lk(a.get(1));const n=st&&st.dict?num(st.dict.get(N('N'))):null;return n===4?'cmyk':n===3?'rgb':n===1?'gray':null}if(k==='CalRGB')return'rgb';if(k==='CalGray')return'gray';return null}
     const n=pdfName(a);return n==='DeviceCMYK'?'cmyk':n==='DeviceRGB'?'rgb':n==='DeviceGray'?'gray':null};
   const conv=(res,nm)=>{if(!nm||/^(DeviceGray|DeviceRGB|DeviceCMYK|Pattern|G|RGB|CMYK|Indexed|I)$/.test(nm))return null;const dict=res&&lk(res.get(N('ColorSpace')));const e=dict&&lk(dict.get(N(nm)));
-    if(!(e instanceof L.PDFArray)||e.size()<4||pdfName(lk(e.get(0)))!=='Separation')return null;const name=pdfName(lk(e.get(1)));if(!shouldConvert(name))return null;const alt=altOf(e.get(2));if(!alt)return{skip:name};return{name,alt,fn:e.get(3)}};
+    if(!(e instanceof L.PDFArray)||e.size()<4||pdfName(lk(e.get(0)))!=='Separation')return null;const name=pdfName(lk(e.get(1)));if(hide&&hide.has(name))return{name,hide:true};if(!shouldConvert(name))return null;const alt=altOf(e.get(2));if(!alt)return{skip:name};return{name,alt,fn:e.get(3)}};
+  const gsDone=new Set();const addGs=r=>{if(!hide||!r||gsDone.has(r))return;gsDone.add(r);let g=lk(r.get(N('ExtGState')));if(!g){g=ctx.obj({});r.set(N('ExtGState'),g)}for(const[k,o]of[['SpHf',{ca:0}],['SpHs',{CA:0}],['SpRf',{ca:1}],['SpRs',{CA:1}]])g.set(N(k),ctx.obj(Object.assign({Type:'ExtGState'},o)))};
   const fmtN=v=>String(Math.round(v*10000)/10000);let changed=0;const skipped=new Set();const done=new Set();
   const emit=(cv,t,stroke)=>{let out;try{out=pdfFnEval(L,ctx,cv.fn,[t])}catch(e){out=null}if(!out){skipped.add(cv.name);return null}changed++;const v=out.map(fmtN).join(' ');
     return cv.alt==='cmyk'?` ${v} ${stroke?'K':'k'} `:cv.alt==='rgb'?` ${v} ${stroke?'RG':'rg'} `:` ${v} ${stroke?'G':'g'} `};
   const isWs=c=>c===32||c===10||c===13||c===9||c===12||c===0;const DELIM='()<>[]{}/%';
-  function filter(str,res,depth){const n=str.length;let i=0,opStart=0,out='';let fc=null,scv=null;const st=[];
+  function filter(str,res,depth,hF,hS){const n=str.length;let i=0,opStart=0,out='';let fc=null,scv=null;const st=[];hF=!!hF;hS=!!hS;if(hide)addGs(res);
     while(i<n){const c=str.charCodeAt(i);if(isWs(c)){i++;continue}const ch=str[i];
       if(ch==='%'){while(i<n&&str[i]!=='\n'&&str[i]!=='\r')i++;continue}
       if(ch==='('){let d=1;i++;while(i<n&&d>0){const x=str[i];if(x==='\\'){i+=2;continue}if(x==='(')d++;else if(x===')')d--;i++}continue}
@@ -878,14 +879,17 @@ function convertSpots(L,doc,page,shouldConvert){
       if(tok==='BI'){const re=/\sEI(?=\s|$)/g;re.lastIndex=i;const r=re.exec(str);i=r?r.index+3:n;out+=str.slice(opStart,i);opStart=i;continue}
       const seg=str.slice(opStart,i);opStart=i;
       if(tok==='cs'||tok==='CS'){const m=seg.match(/\/([^\s\/\[\]<>(){}%]+)\s*(CS|cs)\s*$/);const nm=m?pdfName('/'+m[1]):'';const cv=conv(res,nm);if(cv&&cv.skip){skipped.add(cv.skip)}
-        const good=cv&&!cv.skip?cv:null;if(tok==='cs')fc=good;else scv=good;if(good){const e=emit(good,1,tok==='CS');if(e!=null){out+=seg.replace(/\/[^\s\/\[\]<>(){}%]+\s*(CS|cs)\s*$/,'')+e;continue}if(tok==='cs')fc=null;else scv=null}out+=seg;continue}
-      if((tok==='sc'||tok==='scn')&&fc||(tok==='SC'||tok==='SCN')&&scv){const cv=tok[0]==='s'?fc:scv;const nums=seg.match(/[+\-]?(\d+\.?\d*|\.\d+)/g)||['1'];const t=parseFloat(nums[nums.length-1]);const e=emit(cv,t,tok[0]==='S');
+        const good=cv&&!cv.skip?cv:null;if(tok==='cs')fc=good;else scv=good;
+        if(good&&good.hide){addGs(res);changed++;out+=seg+(tok==='cs'?' /SpHf gs ':' /SpHs gs ');if(tok==='cs')hF=true;else hS=true;continue}
+        if(tok==='cs'&&hF){out+=' /SpRf gs ';hF=false;changed++}if(tok==='CS'&&hS){out+=' /SpRs gs ';hS=false;changed++}
+        if(good){const e=emit(good,1,tok==='CS');if(e!=null){out+=seg.replace(/\/[^\s\/\[\]<>(){}%]+\s*(CS|cs)\s*$/,'')+e;continue}if(tok==='cs')fc=null;else scv=null}out+=seg;continue}
+      if((tok==='sc'||tok==='scn')&&fc&&!fc.hide||(tok==='SC'||tok==='SCN')&&scv&&!scv.hide){const cv=tok[0]==='s'?fc:scv;const nums=seg.match(/[+\-]?(\d+\.?\d*|\.\d+)/g)||['1'];const t=parseFloat(nums[nums.length-1]);const e=emit(cv,t,tok[0]==='S');
         if(e!=null){out+=seg.replace(/[+\-]?(\d+\.?\d*|\.\d+)\s*(sc|scn|SC|SCN)\s*$/,'')+e;continue}}
-      if(tok==='k'||tok==='rg'||tok==='g')fc=null;else if(tok==='K'||tok==='RG'||tok==='G')scv=null;
-      else if(tok==='q')st.push([fc,scv]);else if(tok==='Q'){if(st.length)[fc,scv]=st.pop()}
+      if(tok==='k'||tok==='rg'||tok==='g'){fc=null;if(hF){out+=' /SpRf gs ';hF=false;changed++}}else if(tok==='K'||tok==='RG'||tok==='G'){scv=null;if(hS){out+=' /SpRs gs ';hS=false;changed++}}
+      else if(tok==='q')st.push([fc,scv,hF,hS]);else if(tok==='Q'){if(st.length)[fc,scv,hF,hS]=st.pop()}
       if(tok==='Do'&&depth<6){const m=seg.match(/\/([^\s\/\[\]<>(){}%]+)\s*Do\s*$/);const nm=m?pdfName('/'+m[1]):'';const xd=res&&lk(res.get(N('XObject')));const ref=xd&&nm&&xd.get(N(nm));const xo=lk(ref);
         if(xo&&xo.dict&&pdfName(xo.dict.get(N('Subtype')))==='Form'&&ref instanceof L.PDFRef&&!done.has(ref.toString())){done.add(ref.toString());
-          try{const r2=lk(xo.dict.get(N('Resources')))||res;const before=changed;const ns=filter(latin1(bytesOf(xo)),r2,depth+1);
+          try{const r2=lk(xo.dict.get(N('Resources')))||res;const before=changed;const ns=filter(latin1(bytesOf(xo)),r2,depth+1,hF,hS);
             if(changed>before){const s2=ctx.flateStream(toBytes(ns));for(const[k,v]of xo.dict.entries()){const kn=pdfName(k);if(kn!=='Filter'&&kn!=='Length'&&kn!=='DecodeParms')s2.dict.set(k,v)}ctx.assign(ref,s2)}}catch(e){}}}
       out+=seg}
     out+=str.slice(opStart);return out}
@@ -1728,6 +1732,17 @@ async function addFiles(list){
   else if(added)toast(`נוספו ${added} עמודים${batch.dup?` · ${batch.dup} קבצים כפולים דולגו`:''}${batch.jmp?` · ${batch.jmp} זוהו כגאמפר וסומנו (אפשר לבטל בכרטיס העמוד)`:''}`);
 }
 const pdfjsCache={},pdflibCache={};
+/* preview with hidden spots: a copy of the page where everything painted in a hidden spot is made transparent (preview only, never exported) */
+const hidThumbs={},hidBusy=new Set();
+function hidNames(it){if(!it||it.kind!=='pdf'||!it.fid||it.artThumb||!S.files[it.fid])return[];const all=new Set([...(it.spots||[]),...(it.textSpots||[]),...(it.contours||[]).map(c=>c.spot).filter(Boolean)]);return[...all].filter(n=>S.spotHide&&S.spotHide[n]).sort()}
+function artSrc(it){const base=it.artThumb||it.thumb;const hn=hidNames(it);if(!hn.length)return base;const key=it.fid+':'+it.page+':'+hn.join('|');
+  if(hidThumbs[key])return hidThumbs[key];if(!hidBusy.has(key)){hidBusy.add(key);hiddenThumb(it,hn).then(u=>{if(u){hidThumbs[key]=u;reqStage()}}).catch(()=>{}).finally(()=>hidBusy.delete(key))}return base}
+async function hiddenThumb(it,names){const L=PDFLib;const f=S.files[it.fid];const doc=await L.PDFDocument.load(f.bytes.slice(),{ignoreEncryption:true,updateMetadata:false});
+  const keep=[it.page];const pages=doc.getPages();for(let i=pages.length-1;i>=0;i--)if(!keep.includes(i))doc.removePage(i);const pg=doc.getPage(0);
+  const r=convertSpots(L,doc,pg,()=>false,new Set(names));if(!r.changed)return it.thumb;const bytes=await doc.save();
+  const d=await pdfjsLib.getDocument({data:bytes}).promise;const page=await d.getPage(1);const vp=page.getViewport({scale:1});const sc=Math.min(1100/vp.width,1100/vp.height,3);const v2=page.getViewport({scale:sc});
+  const c=document.createElement('canvas');c.width=Math.ceil(v2.width);c.height=Math.ceil(v2.height);const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+  await page.render({canvasContext:ctx,viewport:v2}).promise;d.destroy&&d.destroy();return c.toDataURL('image/jpeg',0.86)}
 async function pageCount(fid){const f=S.files[fid];if(!f)return 1;if(f.pages)return f.pages;try{const d=pdfjsCache[fid]||(pdfjsCache[fid]=await pdfjsLib.getDocument({data:f.bytes.slice()}).promise);f.pages=d.numPages}catch(e){f.pages=1}return f.pages}
 async function pdfPageArt(fid,idx){const f=S.files[fid];const d=pdfjsCache[fid]||(pdfjsCache[fid]=await pdfjsLib.getDocument({data:f.bytes.slice()}).promise);
   const page=await d.getPage(idx+1);const vp=page.getViewport({scale:1});const s=Math.min(1100/vp.width,1100/vp.height,3);const v2=page.getViewport({scale:s});
@@ -2024,7 +2039,7 @@ function renderTileDlg(){const it=tileSrc;if(!it)return;if(!tileCfg.h.rule)tileC
 `;let badges=`<g><rect x="${r3(tileCfg.corner==='tr'?0:L.W-RB*2.6)}" y="${r3(-RB*0.95)}" width="${r3(RB*2.6)}" height="${r3(RB*0.62)}" rx="${r3(sw*1.5)}" fill="#7c3aed"/><text id="tpXv" x="${r3(tileCfg.corner==='tr'?RB*1.3:L.W-RB*1.3)}" y="${r3(-RB*0.52)}" text-anchor="middle" font-size="${r3(RB*0.4)}" font-weight="700" fill="#fff">${fmt(L.W/10)}</text>
     <rect x="${r3(-RB*0.95)}" y="${r3(L.H-RB*0.62)}" width="${r3(RB*2.6)}" height="${r3(RB*0.62)}" rx="${r3(sw*1.5)}" fill="#7c3aed"/><text id="tpYv" x="${r3(-RB*0.95+RB*1.3)}" y="${r3(L.H-RB*0.2)}" text-anchor="middle" font-size="${r3(RB*0.4)}" font-weight="700" fill="#fff">${fmt(L.H/10)}</text></g>`;
   $('#tilePrev').innerHTML=`<svg id="tpSvg" viewBox="${r3(-RB-sw*2)} ${r3(-RB-sw*2)} ${r3(L.W+RB+sw*6)} ${r3(L.H+RB+sw*6)}" preserveAspectRatio="xMidYMid meet">${rul}
-    <image href="${it.artThumb||it.thumb}" x="${r3(-l*it.sx)}" y="${r3(-t*it.sy)}" width="${r3(it.ow*it.sx)}" height="${r3(it.oh*it.sy)}" preserveAspectRatio="none"/>
+    <image href="${artSrc(it)}" x="${r3(-l*it.sx)}" y="${r3(-t*it.sy)}" width="${r3(it.ow*it.sx)}" height="${r3(it.oh*it.sy)}" preserveAspectRatio="none"/>
     <rect x="0" y="0" width="${r3(L.W)}" height="${r3(L.H)}" fill="none" stroke="#888" stroke-dasharray="${r3(sw*3)} ${r3(sw*2)}" stroke-width="${r3(sw)}"/>
     ${L.tiles.map(q=>`<rect x="${r3(q.x0)}" y="${r3(q.y0)}" width="${r3(q.x1-q.x0)}" height="${r3(q.y1-q.y0)}" fill="none" stroke="#2878e6" stroke-opacity=".25" stroke-width="${r3(sw*0.6)}"/>`).join('')}
     ${(()=>{let o='';const band=(ax,segs)=>{for(let i=0;i<segs.length-1;i++){const a=segs[i+1][0],b2=segs[i][1];const cut=(a+b2)/2;const lo=b2-(Math.min(a,b2));const hiExt=a<b2;
@@ -2434,7 +2449,7 @@ function backMat(it,p,W,H){const b=box(it);const M=pmat(it,p);
 const anyBack=()=>S.items.some(it=>it.back);
 const sheetBack=sh=>!!sh&&sh.duplex!==false&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back});
 function symbolFor(it){const[t,,,l]=it.trim;const b=box(it);const vb=[l-b.bl/it.sx,t-b.bt/it.sy,b.PW/it.sx,b.PH/it.sy].map(r3);
-  return`<symbol id="art-${it.id}" viewBox="${vb.join(' ')}" preserveAspectRatio="none"><image href="${it.artThumb||it.thumb}" x="0" y="0" width="${r3(it.ow)}" height="${r3(it.oh)}" preserveAspectRatio="none"/></symbol>`}
+  return`<symbol id="art-${it.id}" viewBox="${vb.join(' ')}" preserveAspectRatio="none"><image href="${artSrc(it)}" x="0" y="0" width="${r3(it.ow)}" height="${r3(it.oh)}" preserveAspectRatio="none"/></symbol>`}
 function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;const px=v=>v/scale;
   const used=[...new Set(sh.placements.map(p=>p.iid))].map(itemById).filter(Boolean);
   const defs=used.map(backProxy).filter(Boolean).map(symbolFor).join('');let missing=0;
@@ -2531,7 +2546,7 @@ function renderStage(){
   if(!S.wire)for(const it of used){const[t,,,l]=it.trim;const b=box(it);const vb=[l-b.bl/it.sx,t-b.bt/it.sy,b.PW/it.sx,b.PH/it.sy].map(r3);
     const clip=isShape(it)?clipPolysSrc(it):[];
     if(clip.length)defs+=`<clipPath id="clip-${it.id}" clipPathUnits="userSpaceOnUse">${clip.map(P=>`<path d="${dPts(P,true)}"/>`).join('')}</clipPath>`;
-    defs+=`<symbol id="art-${it.id}" viewBox="${vb.join(' ')}" preserveAspectRatio="none"><g${clip.length?` clip-path="url(#clip-${it.id})"`:''}><image href="${it.artThumb||it.thumb}" x="0" y="0" width="${r3(it.ow)}" height="${r3(it.oh)}" preserveAspectRatio="none"/></g></symbol>`}
+    defs+=`<symbol id="art-${it.id}" viewBox="${vb.join(' ')}" preserveAspectRatio="none"><g${clip.length?` clip-path="url(#clip-${it.id})"`:''}><image href="${artSrc(it)}" x="0" y="0" width="${r3(it.ow)}" height="${r3(it.oh)}" preserveAspectRatio="none"/></g></symbol>`}
   let artBleed='',artNet='',netClips='';
   const pls=sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const f=foot(p);const M=pmat(it,p);const{paths,net}=sheetPaths(it,M);
     const cls=['pl',S.sel.has(p.pid)?'sel':'',bad.has(p.pid)?'bad':'',S.isel.has(p.iid)&&!S.sel.has(p.pid)?'hl':'',p.lock?'locked':''].join(' ');
