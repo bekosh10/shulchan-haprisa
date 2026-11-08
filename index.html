@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="270">
+<meta name="app-version" content="271">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -886,6 +886,7 @@ function convertSpots(L,doc,page,shouldConvert,hide){
       if((tok==='sc'||tok==='scn')&&fc&&!fc.hide||(tok==='SC'||tok==='SCN')&&scv&&!scv.hide){const cv=tok[0]==='s'?fc:scv;const nums=seg.match(/[+\-]?(\d+\.?\d*|\.\d+)/g)||['1'];const t=parseFloat(nums[nums.length-1]);const e=emit(cv,t,tok[0]==='S');
         if(e!=null){out+=seg.replace(/[+\-]?(\d+\.?\d*|\.\d+)\s*(sc|scn|SC|SCN)\s*$/,'')+e;continue}}
       if(tok==='k'||tok==='rg'||tok==='g'){fc=null;if(hF){out+=' /SpRf gs ';hF=false;changed++}}else if(tok==='K'||tok==='RG'||tok==='G'){scv=null;if(hS){out+=' /SpRs gs ';hS=false;changed++}}
+      else if(tok==='gs'&&(hF||hS)){out+=seg+(hF?' /SpHf gs ':'')+(hS?' /SpHs gs ':'');changed++;continue}
       else if(tok==='q')st.push([fc,scv,hF,hS]);else if(tok==='Q'){if(st.length)[fc,scv,hF,hS]=st.pop()}
       if(tok==='Do'&&depth<6){const m=seg.match(/\/([^\s\/\[\]<>(){}%]+)\s*Do\s*$/);const nm=m?pdfName('/'+m[1]):'';const xd=res&&lk(res.get(N('XObject')));const ref=xd&&nm&&xd.get(N(nm));const xo=lk(ref);
         if(xo&&xo.dict&&pdfName(xo.dict.get(N('Subtype')))==='Form'&&ref instanceof L.PDFRef&&!done.has(ref.toString())){done.add(ref.toString());
