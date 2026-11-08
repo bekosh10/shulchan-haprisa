@@ -1,0 +1,9 @@
+{
+  "name": "shulchan-haprisa",
+  "productName": "שולחן הפריסה",
+  "version": "1.0.2",
+  "description": "שולחן הפריסה – Imposition bench",
+  "main": "main.js",
+  "author": "bekosh10",
+  "license": "UNLICENSED"
+}

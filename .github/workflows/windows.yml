@@ -1,0 +1,27 @@
+name: Windows build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['desktop/main.js','desktop/preload.js','desktop/package.json','.github/workflows/windows.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Package
+        shell: bash
+        run: |
+          npm i --no-save @electron/packager@18
+          npx electron-packager desktop "Shulchan Haprisa" --platform=win32 --arch=x64 --electron-version=33.2.1 --out=out --overwrite --icon=desktop/icon.ico --ignore="icon\.icns" --app-version=1.0.3 --win32metadata.ProductName="Shulchan Haprisa" --win32metadata.FileDescription="Shulchan Haprisa"
+          cd out && 7z a -tzip ../shulchan-windows-x64.zip "Shulchan Haprisa-win32-x64"
+      - name: Publish release
+        shell: bash
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view windows >/dev/null 2>&1 || gh release create windows --title "Windows" --notes "התקנה לווינדוס"
+          gh release upload windows shulchan-windows-x64.zip --clobber
