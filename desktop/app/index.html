@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="276">
+<meta name="app-version" content="277">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -529,6 +529,7 @@ input[type=number]{width:78px;text-align:left;direction:ltr;font-family:var(--f-
           <label for="gap">מרווח ברירת מחדל בין קווי החיתוך (ס״מ)</label><input data-cm type="number" id="gap" min="0" step="0.5">
           <label for="allowRot">לאפשר סיבוב בסידור האוטומטי</label><input type="checkbox" id="allowRot">
           <label for="snapOn">הצמדה וקווי עזר בגרירה</label><input type="checkbox" id="snapOn">
+          <label for="centerOn">למרכז את הסידור בגיליון (לרוחב ולגובה)</label><input type="checkbox" id="centerOn">
           <label for="pairOn">לשלב צורות זוג-זוג (אחת הפוכה ב-180°)</label><input type="checkbox" id="pairOn">
           <label for="splitSides">להפריד עמודים חד-צדדיים ודו-צדדיים לגיליונות נפרדים</label><input type="checkbox" id="splitSides">
           <label for="flipAxis">צד B מתהפך סביב</label><select id="flipAxis"><option value="v">ציר אנכי (ימין ↔ שמאל)</option><option value="h">ציר אופקי (למעלה ↕ למטה)</option></select>
@@ -625,6 +626,8 @@ input[type=number]{width:78px;text-align:left;direction:ltr;font-family:var(--f-
 
 <div class="ctx" id="shmenu" role="menu" hidden>
   <div class="lbl" id="shmenuLbl">גיליון</div>
+  <button role="menuitem" data-sc="center">מרכז את הגיליון</button>
+  <button role="menuitem" data-sc="centerAll">מרכז את כל הגיליונות</button>
   <button role="menuitem" data-sc="dup">שכפל גיליון</button>
   <button role="menuitem" data-sc="lock">נעל / שחרר גיליון</button>
   <button role="menuitem" data-sc="del">מחק גיליון</button>
@@ -1266,7 +1269,15 @@ function rasterEngine(sh,ax,ay,aw,ah){const cell=cellSize(sh);const cols=Math.ma
     return[mk(pv.o0,0),mk(pv.o1,180)]}}}
 function fillLimit(sh){const m=mediaOf(sh);if(m.type!=='roll')return null;if(sh.len>0)return Math.min(+m.h,sh.len);
   return Math.min(+m.h,10000)}
-function fillSheet(sh,fills){let n=0;
+/* centering: after the packer fills a sheet from its corner, the whole layout is moved to the middle of the work area.
+   Before more is packed onto it, it is moved back to the corner, so the packer sees the same free space as before. */
+function uncenter(sh){const c=sh&&sh._ctr;if(!c)return;for(const p of sh.placements){p.x=Math.round((p.x-c.dx)*100)/100;p.y=Math.round((p.y-c.dy)*100)/100}delete sh._ctr}
+function centerSheet(sh,force){if(!sh||!sh.placements.length||(!force&&S.nest.center===false))return false;if(sh.placements.some(p=>p.lock))return false;uncenter(sh);
+  const a=viewArea(sh),bb=bboxOf(sh.placements),roll=mediaOf(sh).type==='roll';
+  const dx=bb.w<=a.w+0.01?Math.round((a.x+(a.w-bb.w)/2-bb.x)*100)/100:0,dy=!roll&&bb.h<=a.h+0.01?Math.round((a.y+(a.h-bb.h)/2-bb.y)*100)/100:0;
+  if(!dx&&!dy)return false;for(const p of sh.placements){p.x=Math.round((p.x+dx)*100)/100;p.y=Math.round((p.y+dy)*100)/100}sh._ctr={dx,dy};return true}
+function centerDirty(){for(const sh of S.sheets)if(sh._dirty){delete sh._dirty;centerSheet(sh)}}
+function fillSheet(sh,fills){uncenter(sh);sh._dirty=1;let n=0;
   for(const g of fills.filter(it=>it.cols>0||isJmp(it)))n+=placeFixed(sh,g,100000,true).length;fills=fills.filter(it=>!(it.cols>0||isJmp(it)));if(!fills.length)return n;
   for(let round=0;round<4;round++){const eng=engineFor(sh,fillLimit(sh),fills);let m=0,progress=true;
     while(progress&&n+m<4000){progress=false;for(const it of fills){if(eng.placePair&&eng.placePair(it)){m+=2;progress=true}else if(eng.place(it)){m++;progress=true}}}
@@ -1576,7 +1587,7 @@ async function autoNest(){
       const fills=ordered.filter(it=>it.fill&&mine(it));
       if(fills.length){if(!made.length){const sh={sid:nid('s'),mediaId:m.id,manual:false,placements:[],minLen:0};if(duplex!==null)sh.duplex=duplex;made.push(sh)}for(const sh of made)fillSheet(sh,fills)}
       made.forEach(compactSheet);auto.push(...made)}
-    S.sheets=[...manual,...auto];S.cur=auto.length&&!manual.length?0:Math.min(S.cur,Math.max(0,S.sheets.length-1));S.sel.clear();
+    for(const x of auto)x._dirty=1;S.sheets=[...manual,...auto];S.cur=auto.length&&!manual.length?0:Math.min(S.cur,Math.max(0,S.sheets.length-1));S.sel.clear();
     busy(false);renderAll();
     if(tooBig.size)toast(`לא נכנס על ${m.name}: ${[...tooBig].map(id=>itemById(id).name).join(', ')}`);
     else toast(`סודרו ${auto.length} גיליונות${manual.length?` · ${manual.length} ידניים נשמרו`:''}`);
@@ -2118,7 +2129,7 @@ function newManualSheet(mediaId){const m=mediaById(mediaId);const sh={sid:nid('s
 function fillSig(it,sh){const b=box(it);return [sh.sid,sh.placements.length,it.sx,it.sy,b.B,it.space,it.orient].join('|')}
 function canAdd(it){const sh=curSheet();if(!sh)return true;if(it.fill)return it._fillSig!==fillSig(it,sh);return (countPlaced([sh])[it.id]||0)<(it.qty|0)}
 function rollLim(sh){const m=mediaOf(sh);if(m.type!=='roll')return null;return sh.len>0?Math.min(+m.h,sh.len):+m.h}
-function placeOn(sh,it,n){if(isJmp(it))return placeJumpers(sh,it,n);if(it.cols>0)return placeGrid(sh,it,n);const L=rollLim(sh);const eng=engineFor(sh,L!=null?L:undefined,[it]);const made=[];let left=n;
+function placeOn(sh,it,n){uncenter(sh);sh._dirty=1;if(isJmp(it))return placeJumpers(sh,it,n);if(it.cols>0)return placeGrid(sh,it,n);const L=rollLim(sh);const eng=engineFor(sh,L!=null?L:undefined,[it]);const made=[];let left=n;
   const fits=p=>!outOfArea(sh).has(p.pid);const drop=p=>{sh.placements=sh.placements.filter(q=>q!==p)};
   while(left>0){if(left>=2&&eng.placePair){const pr=eng.placePair(it);if(pr){if(pr.every(fits)){made.push(...pr);left-=2;continue}pr.forEach(drop);}}
     const p=eng.place(it);if(!p)break;if(!fits(p)){drop(p);break}made.push(p);left--}
@@ -2374,7 +2385,7 @@ function renderSettings(){renderMarksSummary();renderShapes();
   $('#activeMedia').innerHTML=opts;$('#activeMedia').value=(curSheet()&&curSheet().mediaId)||S.active;
   syncMedia();if(!$('#mediaMgr').hidden)renderSubMgr();
   $('#mkOn').checked=S.marks.on;{const md=$('#mkDef');if(md)md.checked=!!S.marks.defPid&&S.marks.defPid===S.marks.pid}$('#mkFifth').checked=S.marks.fifth!==false;$('#mkName').value=(activeDots()||{}).name||'';$('#mkD').value=S.marks.d;$('#mkO').value=S.marks.o;$('#mkRef').value=S.marks.ref||'art';$('#mkG').value=S.marks.gap!=null?S.marks.gap:5;{const art=(S.marks.ref||'art')!=='edge';$('#mkG').closest('.kv')&&($('#mkG').disabled=!art,$('#mkO').disabled=art)}$('#mkF').value=S.marks.f;$('#mkDir').value=S.marks.dir;$('#mkC').value=S.marks.clear;
-  $('#gap').value=S.nest.gap;$('#allowRot').checked=S.nest.rot;$('#snapOn').checked=S.nest.snap;$('#flipAxis').value=S.nest.flipAxis||'v';$('#splitSides').checked=S.nest.splitSides!==false;$('#pairOn').checked=S.nest.pair!==false;$('#shapeBleed').value=S.nest.shapeBleed;$('#cellSz').value=S.nest.cell;$('#dpi').value=S.dpi;
+  $('#gap').value=S.nest.gap;$('#allowRot').checked=S.nest.rot;$('#centerOn').checked=S.nest.center!==false;$('#snapOn').checked=S.nest.snap;$('#flipAxis').value=S.nest.flipAxis||'v';$('#splitSides').checked=S.nest.splitSides!==false;$('#pairOn').checked=S.nest.pair!==false;$('#shapeBleed').value=S.nest.shapeBleed;$('#cellSz').value=S.nest.cell;$('#dpi').value=S.dpi;
   $('#cutNames').value=S.cfg.cutNames;$('#creaseNames').value=S.cfg.creaseNames;$('#outCut').value=S.cfg.outCut;$('#outCrease').value=S.cfg.outCrease;$('#kissNames').value=S.cfg.kissNames||'';$('#outKiss').value=S.cfg.outKiss||'Kiss-cut';$('#spotInPrint').checked=S.cfg.spotInPrint;
   const W=300,H=200,o=S.marks.o,f=S.marks.f,r=Math.max(2.5,S.marks.d/2);const ins=o+S.marks.d/2+S.marks.clear;
   $('#markPrev').innerHTML=`<svg viewBox="-8 -8 ${W+16} ${H+16}" width="100%" role="img" aria-label="תצוגת מיקום הסימנים">
@@ -2685,7 +2696,7 @@ function renderStrip(){
   $('#stripList').innerHTML=tabs+(tab!=='off'?(on.length?on.map(it=>row(it,true)).join(''):'<p class="hint">אין פריטים על הגיליון הזה.</p>'):'')+(tab!=='on'&&off.length?(tab==='all'?`<div class="strip-sub">לא על הגיליון הזה</div>`:'')+off.map(it=>row(it,false)).join(''):(tab==='off'?'<p class="hint">כל הפריטים נמצאים על הגיליון הזה.</p>':''));
   $('#stripSpots').innerHTML=spotHTML;
 }
-function renderAll(){for(const x of S.sheets)if(!x.placements.length&&x.qty>1)x.qty=1;renderItems();renderProps();renderSettings();renderThumbs();renderStage();renderStrip();updUndo();scheduleSave()}
+function renderAll(){centerDirty();for(const x of S.sheets)if(!x.placements.length&&x.qty>1)x.qty=1;renderItems();renderProps();renderSettings();renderThumbs();renderStage();renderStrip();updUndo();scheduleSave()}
 
 /* ---------- canvas interaction ---------- */
 const svg=$('#svg');const wrapEl=$('#wrap');
@@ -2981,7 +2992,7 @@ bind('#allowRot',t=>S.nest.rot=t.checked);
 bind('#snapOn',t=>S.nest.snap=t.checked);
 bind('#flipAxis',t=>S.nest.flipAxis=t.value);
 bind('#splitSides',t=>S.nest.splitSides=t.checked);
-bind('#pairOn',t=>S.nest.pair=t.checked);
+bind('#pairOn',t=>S.nest.pair=t.checked);bind('#centerOn',t=>{S.nest.center=t.checked});
 bind('#shapeBleed',t=>S.nest.shapeBleed=Math.max(0,parseFloat(t.value)||0));
 bind('#cellSz',t=>S.nest.cell=Math.max(0,parseFloat(t.value)||0));
 bind('#dpi',t=>S.dpi=Math.max(10,parseInt(t.value,10)||150));
@@ -3000,6 +3011,8 @@ function openShMenu(i,btn){shMenuIdx=i;const m=$('#shmenu');$('#shmenuLbl').text
   m.style.left=Math.max(8,Math.min(r.left,innerWidth-mr.width-8))+'px';m.style.top=Math.max(8,r.top-mr.height-6)+'px';const f=m.querySelector('button');if(f)f.focus({preventScroll:true})}
 $('#shmenu').addEventListener('click',e=>{const b=e.target.closest('[data-sc]');if(!b)return;const i=shMenuIdx;$('#shmenu').hidden=true;const sh=S.sheets[i];if(!sh)return;snap();
   if(b.dataset.sc==='dup'){const gm=new Map();const copy=Object.assign({},sh,{sid:nid('s'),mediaId:sh.mediaId,ov:sh.ov?Object.assign({},sh.ov):undefined,manual:true,placements:sh.placements.map(p=>{const q=Object.assign({},p,{pid:nid('p')});if(p.gid){if(!gm.has(p.gid))gm.set(p.gid,nid('g'));q.gid=gm.get(p.gid)}return q})});if(sh.mk)copy.mk=sh.mk.map(a=>a.slice());S.sheets.splice(i+1,0,copy);S.cur=i+1;toast(`גיליון ${i+1} שוכפל`)}
+  else if(b.dataset.sc==='center'){toast(centerSheet(sh,true)?`גיליון ${i+1} מורכז`:'הגיליון כבר ממורכז (או שיש בו עמוד נעול)')}
+  else if(b.dataset.sc==='centerAll'){let n=0;for(const x of S.sheets)if(centerSheet(x,true))n++;toast(n?`מורכזו ${n} גיליונות`:'כל הגיליונות כבר ממורכזים')}
   else if(b.dataset.sc==='lock'){sh.manual=!sh.manual;toast(sh.manual?'הגיליון נעול ויישמר בסידור הבא':'הגיליון ישוחרר ויסודר מחדש בסידור הבא')}
   else if(b.dataset.sc==='del'){S.sheets.splice(i,1);S.cur=Math.max(0,Math.min(S.cur>=i?S.cur-1:S.cur,S.sheets.length-1));if(S.cur<0)S.cur=0;toast(`גיליון ${i+1} נמחק. אפשר לבטל עם Ctrl+Z.`)}
   S.sel.clear();renderAll()});
