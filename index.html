@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="279">
+<meta name="app-version" content="280">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -1540,18 +1540,20 @@ function plan3(S,data){const G=geom(S);const sheets=[];const W=S.W,H=S.H;const n
        A design big enough for bigSheets full sheets of its own gets one layout of its own, printed floor(qty/cap) times;
        its remainder joins the shared jumper sheet (never a strip sheet). */
     if(!cap){notes.push('הגאמפרים לא נכנסים לגיליון');sheets.notes=notes;return{G,sheets}}
-    const thr=Math.max(1,S.bigSheets||3)*cap;const rest=[];
-    const bigs=gum.filter(d=>d.qty>=thr);const lone=bigs.length===1&&gum.length===1;
-    for(const d of gum.slice().sort((a,b)=>b.qty-a.qty)){
-      if(d.qty>=thr&&lone){const k=ceil(d.qty,cap),n=ceil(d.qty,k);const B=buildLanes(S,G,pure);const f=fill(B.lanes,{G:[{id:d.id,rem:n,area:1}],S:[],L:[]},{extras:false,pure:true});
-        const sh={cfg:pure,lanes:B.lanes,placed:f.placed,tag:'גאמפר '+d.name};for(let i=0;i<k;i++)sheets.push(sh);continue}
-      if(d.qty>=thr){const k=Math.floor(d.qty/cap);const B=buildLanes(S,G,pure);const f=fill(B.lanes,{G:[{id:d.id,rem:cap,area:1}],S:[],L:[]},{extras:false,pure:true});
-        const sh={cfg:pure,lanes:B.lanes,placed:f.placed,tag:'גאמפר '+d.name};for(let i=0;i<k;i++)sheets.push(sh);
-        const r=d.qty-k*f.placed.length;if(r>0)rest.push(Object.assign({},d,{qty:r}))}
-      else rest.push(d)}
-    if(rest.length){const R=combo(rest);
-      if(R){const sh={cfg:pure,lanes:R.B.lanes,placed:R.f.placed,tag:rest.length>1?'גאמפרים יחד':'גאמפר '+rest[0].name};for(let i=0;i<R.k;i++)sheets.push(sh)}
-      else notes.push('הגאמפרים לא נכנסים יחד לגיליון')}}
+    const thr=Math.max(1,S.bigSheets||3)*cap;const all=gum.slice().sort((a,b)=>b.qty-a.qty);
+    /* option A: everything on one shared layout */
+    const A=combo(all);const optA=A?{prints:A.k,sets:[{r:A,tag:all.length>1?'גאמפרים יחד':'גאמפר '+all[0].name}]}:null;
+    /* option B: designs that fill bigSheets+ sheets get full sheets of their own; remainders + the rest share one layout */
+    let optB=null;const bigs=all.filter(d=>d.qty>=thr);
+    if(bigs.length&&all.length>1){const sets=[];const rest=[];let prints=0,ok=true;
+      for(const d of all){if(d.qty>=thr){const k=Math.floor(d.qty/cap);const B=buildLanes(S,G,pure);const f=fill(B.lanes,{G:[{id:d.id,rem:cap,area:1}],S:[],L:[]},{extras:false,pure:true});
+          sets.push({r:{k,B,f},tag:'גאמפר '+d.name});prints+=k;const r=d.qty-k*f.placed.length;if(r>0)rest.push(Object.assign({},d,{qty:r}))}else rest.push(d)}
+      if(rest.length){const R=combo(rest);if(R){sets.push({r:R,tag:'גאמפרים יחד'});prints+=R.k}else ok=false}
+      if(ok)optB={prints,sets}}
+    /* fewer prints wins; on a tie, the single shared layout */
+    const best=optA&&(!optB||optA.prints<=optB.prints)?optA:optB;
+    if(best){for(const o of best.sets){const sh={cfg:pure,lanes:o.r.B.lanes,placed:o.r.f.placed,tag:o.tag};for(let i=0;i<o.r.k;i++)sheets.push(sh)}}
+    else notes.push('הגאמפרים לא נכנסים יחד לגיליון')}
   sheets.notes=notes;return{G,sheets}}
 return{GUM,SS,LS,planRules,plan3,parsePdf,parseText,PAL}})();
 const TG_LABEL={G:'גאמפר',S:'פס קצר',L:'פס ארוך'};
@@ -3475,7 +3477,7 @@ function openTG(){const cfg=tgSettings();if(!tgState)tgState={res:{G:[],S:[],L:[
           <li><b>פסי מדף, קצרים וארוכים, תמיד יחד</b> בלייאאוט אחד משותף לכל העיצובים: שתי עמודות של קצרים שוכבים, והארוכים עומדים בצד. הגיליון מודפס כמה פעמים שצריך.</li>
           <li><b>גאמפרים תמיד בגיליונות נפרדים</b>, לעולם לא יחד עם פסי מדף.</li>
           <li><b>כל הגאמפרים יחד</b> בגיליון אחד, כל עיצוב לפי היחס שלו בכמות, והגיליון מודפס כמה פעמים שצריך.</li>
-          <li><b>גאמפר בכמות גדולה</b>, שממלא לבד לפחות ${cfg.bigSheets} גיליונות מלאים (כולל ספייר), מקבל גיליון משלו שמודפס כמה פעמים. השארית שלו מצטרפת לגיליון הגאמפרים המשותף, לא לפסי המדף.</li>
+          <li><b>גאמפר בכמות גדולה</b>, שממלא לבד לפחות ${cfg.bigSheets} גיליונות מלאים (כולל ספייר), יכול לקבל גיליון משלו, והשארית שלו מצטרפת לגיליון הגאמפרים המשותף (לא לפסי המדף). המערכת בודקת את שתי האפשרויות ובוחרת את זו עם פחות הדפסות. אם שווה, הכל יחד בפריסה אחת.</li>
           <li>כמות בכל גיליון = כמות + ספייר, חלקי מספר ההדפסות, מעוגל למעלה. בלי מילוי בעודפים.</li>
           <li>השוליים נמדדים עד קו החיתוך (Griffin: 1 / 2 למטה / 1 / 1), והפריסה ממורכזת בשטח שבין השוליים.</li>
         </ul></details>
