@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="280">
+<meta name="app-version" content="281">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -1358,7 +1358,7 @@ function placeJumpers(sh,it,count,fillMode){if(count<=0)return[];const G=jmpGeo(
 const TG=(()=>{
 const GUM={w:10,h:23.91,card:10,stem:1.2,stemL:11,bar:9.31,barH:2.91};
 const SS={w:3,l:60}, LS={w:3.5,l:99};
-function geom(S){const g=S.gap,P=GUM.bar+GUM.stem+2*g,s=GUM.card+g,Bh=s+GUM.h;
+function geom(S){const g=S.gap,P=Math.max(GUM.bar+GUM.stem+2*g,GUM.w+g),s=GUM.card+g,Bh=s+GUM.h;
   const bandN=Math.floor((S.W-GUM.w)/(P/2)+1e-9)+1;const rowN=Math.floor((S.W+g)/(GUM.h+g)+1e-9);return{g,P,s,Bh,bandN,rowN,Hu:S.H-S.top}}
 function buildLanes(S,G,cfg){
   const lanes=[];let y=S.top;const g=G.g;let zones=0;
@@ -1483,7 +1483,10 @@ const findOrder=t=>{const m=String(t).replace(/[‎‏‪-‮]/g,'').match(/SO\s
 function fromRows(rows){const res={G:[],S:[],L:[]},skipped=[];let topic='ללא כותרת';
   for(const r of rows){if(/={3,}/.test(r.desc)){topic=cleanHeader(r.desc)||topic;continue}
     const k=kindOfText(r.desc);if(!k){if(r.qty)skipped.push(r.desc);continue}if(!r.qty)continue;
-    const ex=res[k].find(d=>d.name===topic);if(ex)ex.qty+=r.qty;else res[k].push({name:topic,qty:r.qty})}
+    /* the design's own name in the line (e.g. 'גמפר פולי גודל 13/13 - קונסולות'): what is left after the product words */
+    const own=r.desc.replace(/ג['׳`]?\s?מפר|גאמפר|פס\s*מדף/g,' ').replace(/פולי(פרופילן)?/g,' ').replace(/(גודל|קוטר)\s*[\d.]+(\s*\/\s*[\d.]+)?/g,' ').replace(/[\d.]+\s*\/\s*[\d.]+/g,' ').replace(/\+?\s*פס\s*דו?צ?/g,' ').replace(/[-–—+]/g,' ').replace(/\s+/g,' ').trim();
+    const name=own?(topic==='ללא כותרת'?own:topic+' · '+own):topic;
+    const ex=res[k].find(d=>d.name===name);if(ex)ex.qty+=r.qty;else res[k].push({name,qty:r.qty})}
   return{res,skipped}}
 async function parsePdf(data){let orderNo='';const doc=await pdfjsLib.getDocument({data}).promise;const rows=[];
   for(let p=1;p<=doc.numPages;p++){const tc=await(await doc.getPage(p)).getTextContent();
