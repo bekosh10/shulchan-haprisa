@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="281">
+<meta name="app-version" content="282">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -1581,6 +1581,9 @@ async function autoNest(){
     const groups=split?[false,true]:[null];
     const auto=[];const tooBig=new Set();
     for(const duplex of groups){const mine=it=>duplex===null||!!it.back===duplex;
+      {const J=ordered.filter(it=>mine(it)&&isJmp(it)&&!it.fill&&(it.qty|0)>(placed[it.id]||0));
+        if(J.length>1){const base={sid:'tmp',mediaId:m.id,placements:[]};if(duplex!==null)base.duplex=duplex;const made=gumPlan(J,base,it=>Math.max(0,(it.qty|0)-(placed[it.id]||0)));
+          if(made.length){for(const x of made){x.manual=false;auto.push(x)}for(const it of J)placed[it.id]=it.qty|0}}}
       let queue=[];for(const it of ordered){if(it.fill||!mine(it))continue;const n=Math.max(0,(it.qty|0)-(placed[it.id]||0));for(let k=0;k<n;k++)queue.push(it)}
       const made=[];
       while(queue.length){const sh={sid:nid('s'),mediaId:m.id,manual:false,placements:[]};if(duplex!==null)sh.duplex=duplex;
@@ -2161,7 +2164,32 @@ function cloneSheetAfter(cur){const ns={sid:nid('s'),mediaId:cur.mediaId||S.acti
   for(const k of ['dotsPid','tmOn','lnOn'])if(cur[k])ns[k]=JSON.parse(JSON.stringify(cur[k]));S.sheets.splice(S.sheets.indexOf(cur)+1,0,ns);return ns}
 function unshort(sh){if(sh&&sh._short){if(sh._full)sh.len=sh._full;else delete sh.len;delete sh._short}}
 function reshort(sh){if(sh&&sh._tail!=null&&mediaOf(sh).type==='roll'&&!sh._short&&sh.placements.length){sh._full=sh.len||0;sh._short=1;sh.len=Math.min(+mediaOf(sh).h,Math.round((usedBottom(sh)+sh._tail)*10)/10)}}
-function addMany(items){snap();let sh=curSheet();if(!sh)sh=newManualSheet(S.active);const start=sh;let added=0,skipped=0;const tail=sh._tail;
+/* regular jumpers (not a Tor order): several jumper pages with their quantities are laid out by the Tor rules –
+   one shared layout in proportion, printed as many times as needed; a big design gets its own sheet only when that means fewer prints */
+function gumPlan(items,base,need){const res=[];if(!base)return res;
+  const groups=[];for(const it of items){const g=jmpGeo(it);if(!g)continue;const gr=groups.find(q=>Math.abs(q.g.W-g.W)<0.5&&Math.abs(q.g.L-g.L)<0.5&&Math.abs(q.g.hc-g.hc)<0.5);if(gr)gr.items.push(it);else groups.push({g,items:[it]})}
+  for(const{g:geo,items:its}of groups){const m=mediaOf(base);const a=areaOf(base);let Bm=0;for(const it of its)Bm=Math.max(Bm,box(it).B);
+    Object.assign(TG.GUM,{w:geo.W/10,h:geo.L/10,card:geo.hc/10,stem:geo.ws/10,bar:geo.wb/10,barH:geo.hb/10});
+    const gap=Math.max(...its.map(spacing))/10;const A={x:a.x+Bm,y:a.y+Bm,w:a.w-2*Bm,h:a.h-2*Bm};
+    const G=its.map((it,i)=>({id:'G'+i,name:it.name,qty:need(it)})).filter(d=>d.qty>0);if(!G.length)continue;
+    const P=TG.plan3({W:A.w/10,H:A.h/10,top:0,gap,bigSheets:(S.cfg.tg&&+S.cfg.tg.bigSheets)||3},{G,S:[],L:[]});if(!P.sheets.length)continue;
+    const GU=TG.GUM;const DM={up:[GU.w,GU.h],inv:[GU.w,GU.h],lie:[GU.h,GU.w]};const nb=new Map();const nbr=(it,r)=>{const k=it.id+'|'+r;if(!nb.has(k))nb.set(k,polysBB(netPolys(it,{x:0,y:0,rot:r,fx:false,fy:false})));return nb.get(k)};
+    const byId={};G.forEach(d=>byId[d.id]=its[+d.id.slice(1)]);
+    const grp=[];for(const sh of P.sheets){const l=grp[grp.length-1];if(l&&l.sh===sh)l.n++;else grp.push({sh,n:1})}
+    for(const q of grp){const ns={sid:nid('s'),mediaId:base.mediaId,manual:true,placements:[],minLen:0};if(base.ov)ns.ov=Object.assign({},base.ov);if(base.len)ns.len=base.len;if(base.duplex!=null)ns.duplex=base.duplex;if(q.n>1)ns.qty=q.n;
+      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const L of q.sh.lanes)for(const t of L.slots){const[w,h]=DM[t.t];x0=Math.min(x0,t.x);y0=Math.min(y0,t.y);x1=Math.max(x1,t.x+w);y1=Math.max(y1,t.y+h)}
+      const ox=A.x+((A.w/10-(x1-x0))/2-x0)*10,oy=A.y+((A.h/10-(y1-y0))/2-y0)*10;
+      for(const p of q.sh.placed){const it=byId[p.d];if(!it)continue;const rot=((p.t==='up'?geo.rU:p.t==='inv'?geo.rU+180:geo.rU+270)%360+360)%360;const o=nbr(it,rot);
+        ns.placements.push({pid:nid('p'),iid:it.id,x:Math.round((ox+p.x*10-o.x0)*1000)/1000,y:Math.round((oy+p.y*10-o.y0)*1000)/1000,rot,fx:false,fy:false,grid:true})}
+      res.push(ns)}}
+  return res}
+function addMany(items){snap();let sh=curSheet();if(!sh)sh=newManualSheet(S.active);
+  {const J=items.filter(it=>isJmp(it)&&!it.fill&&(it.qty|0)>(countPlaced(S.sheets)[it.id]||0));
+   if(J.length>1){const cp=countPlaced(S.sheets);const made=gumPlan(J,sh,it=>Math.max(0,(it.qty|0)-(cp[it.id]||0)));
+     if(made.length){let at=S.sheets.indexOf(sh);if(!sh.placements.length){S.sheets.splice(at,1);at--}S.sheets.splice(at+1,0,...made);sh=made[0];items=items.filter(it=>!J.includes(it))}
+     if(!items.length){S.cur=S.sheets.indexOf(made[0]);S.sel.clear();syncIsel();renderAll();const pr=made.reduce((n,x)=>n+shQty(x),0);toast(`גאמפרים לפי החוקיות של תור: ${made.length} ${made.length>1?'לייאאוטים':'לייאאוט'} · ${pr} הדפסות`);return}
+     if(made.length)sh=made[made.length-1]}}
+  const start=sh;let added=0,skipped=0;const tail=sh._tail;
   for(const it of items){if(it.fill){const n=fillSheet(sh,[it]);if(n){added+=n;fillToQty([it])}continue}
     const tot=countPlaced(S.sheets)[it.id]||0;const need=(it.qty|0)-tot;if(need<=0){skipped++;continue}
     if(shQty(sh)>1)sh=cloneSheetAfter(sh);unshort(sh);
