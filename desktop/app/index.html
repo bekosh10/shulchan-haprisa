@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="282">
+<meta name="app-version" content="283">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -3206,7 +3206,7 @@ function scheduleSave(){if(!booted)return;clearTimeout(saveT);saveT=setTimeout(a
   const k=idx.findIndex(r=>r.id===jobId);if(k>=0)idx[k]=row;else idx.unshift(row);await IDB.put('kv','jobs',idx);await IDB.put('kv','last',jobId);
   if(await IDB.put('kv','job:'+jobId,d0)){const d=new Date();$('#savedLbl').textContent=`נשמר בדפדפן ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}},1200)}
 function applyJobSettings(st){if(!st)return;if(!S.subs)S.subs=[];for(const bb of st.subsAll||[]){if(!S.subs.some(b=>b.id===bb.id))S.subs.push(JSON.parse(JSON.stringify(bb)))}for(const mm of st.mediaAll||[]){if(!S.media.some(m=>m.id===mm.id))S.media.push(Object.assign({},mm))}if(st.media){const ex=S.media.find(m=>m.id===st.media.id);if(ex)Object.assign(ex,st.media);else S.media.push(Object.assign({},st.media));S.active=st.media.id}
-  for(const k of['marks','nest','cfg'])if(st[k])Object.assign(S[k],st[k]);if(!(st.nest&&st.nest.gapV2)){S.nest.gap=0;S.nest.gapV2=1}if(S.nest.defBleed==null)S.nest.defBleed=3;normCfg();if(st.dpi)S.dpi=st.dpi;S.spotMap=st.spotMap||{};saveSettings()}
+  for(const k of['marks','nest','cfg'])if(st[k])Object.assign(S[k],st[k]);if(!(st.nest&&st.nest.gapV2)){S.nest.gap=0;S.nest.gapV2=1}if(S.nest.defBleed==null)S.nest.defBleed=3;normCfg();if(st.dpi)S.dpi=st.dpi;if(st.spotMap)S.spotMap=st.spotMap;saveSettings()}
 function loadJob(j,files){jobId=j.id||newJobId();jobName=j.name||'';jobPath=j.path||'';$('#jobName').value=jobName;applyJobSettings(j.settings);S.items=(j.items||[]).map(it=>Object.assign(newItemShell(),it,{open:false}));S.fileOpen={};S.sheets=j.sheets||[];S.cur=Math.min(j.cur||0,Math.max(0,S.sheets.length-1));S.files=files;
   uid=Math.max(uid,j.uid||1);S.nextNo=Math.max(S.nextNo,j.nextNo||1);S.sel.clear();S.isel.clear();hist=[];fut=[]}
 function newItemShell(){return{trim:[0,0,0,0],sx:1,sy:1,bleed:0,space:null,cutMode:'rect',contours:null,frame:true,orient:'auto',qty:1,fill:false,group:'',lockScale:true}}
@@ -3370,11 +3370,16 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
       {const MK=mkOf(sh);if(MK.on||(sh.xdots&&sh.xdots.length)||lineSets().some(l=>lnOn(l,sh)))for(const[cx,cy]of sheetMarks(sh,W,H))pg.drawCircle({x:cx*K,y:(H-cy)*K,size:MK.d/2*K,color:rgb(0,0,0)})}
       if(kind==='print')await drawTextMarks(out,pg,sh,W,H,K);
       if(kind==='print')dplusPdf(pg,sh,W,H,K,'A');
-      if(kind==='print'&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back})){backPages++;const pb=out.addPage([W*K,H*K]);
+      if(kind==='print'&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back})){backPages++;const pb=out.addPage([W*K,H*K]);const backNet=[];
         for(const p of sh.placements){const it=itemById(p.iid);if(!it||!it.back)continue;const bp=backProxy(it);const b=box(it);const M=backMat(it,p,W,H);const e=await embedFor(bp);
           const key=PDFName.of('Lx'+(++xc));pb.node.setXObject(key,e.obj.ref);const P=(u,v)=>{const q=ap(M,u,v);return[q[0]*K,(H-q[1])*K]};
           const mat=artMat(e,bp,b,P);
-          pb.pushOperators(L.pushGraphicsState(),...(e.full?boxClip(b,P):[]),L.concatTransformationMatrix(...mat),L.drawObject(key),L.popGraphicsState())}dplusPdf(pb,sh,W,H,K,'B');}}
+          pb.pushOperators(L.pushGraphicsState(),...(e.full?boxClip(b,P):[]),L.concatTransformationMatrix(...mat),L.drawObject(key),L.popGraphicsState());
+          /* side B: the same second pass as side A – each page again inside its own cell, so a neighbour's bleed does not cover it */
+          const fl=S.nest.flipAxis==='h'?([x,y])=>[x,H-y]:([x,y])=>[W-x,y];backNet.push({key,mat,polys:bleedCell(sh,p).map(poly=>poly.map(fl))})}
+        for(const np of backNet){const ops=[L.pushGraphicsState()];for(const poly of np.polys){poly.forEach(([x,y],i)=>{const q=[x*K,(H-y)*K];ops.push(i?L.lineTo(q[0],q[1]):L.moveTo(q[0],q[1]))});ops.push(L.closePath())}
+          ops.push(L.clip(),L.endPath(),L.concatTransformationMatrix(...np.mat),L.drawObject(np.key),L.popGraphicsState());pb.pushOperators(...ops)}
+        dplusPdf(pb,sh,W,H,K,'B');}}
     const bytes=await out.save();busy(false);
     const fname=`${base||'layout'}${opts.suffix||''}_${kind}.pdf`;
     if(opts.collect){opts.collect.push({name:fname,bytes:new Uint8Array(bytes)});return true}
