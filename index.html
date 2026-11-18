@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="283">
+<meta name="app-version" content="284">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -2505,18 +2505,21 @@ function symbolFor(it){const[t,,,l]=it.trim;const b=box(it);const vb=[l-b.bl/it.
   return`<symbol id="art-${it.id}" viewBox="${vb.join(' ')}" preserveAspectRatio="none"><image href="${artSrc(it)}" x="0" y="0" width="${r3(it.ow)}" height="${r3(it.oh)}" preserveAspectRatio="none"/></symbol>`}
 function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;const px=v=>v/scale;
   const used=[...new Set(sh.placements.map(p=>p.iid))].map(itemById).filter(Boolean);
-  const defs=used.map(backProxy).filter(Boolean).map(symbolFor).join('');let missing=0;
+  const defs=used.map(backProxy).filter(Boolean).map(symbolFor).join('');let missing=0;let bkClips='',bkNet='',bkLines='';
   const pls=sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const M=backMat(it,p,W,H);
     const corners=[[0,0],[b.PW,0],[b.PW,b.PH],[0,b.PH]].map(([u,v])=>ap(M,u,v));const d=dPts(corners,true);
     if(!it.back){missing++;const f=foot(p);const cx=S.nest.flipAxis==='h'?p.x+f.fw/2:W-p.x-f.fw/2,cy=S.nest.flipAxis==='h'?H-p.y-f.fh/2:p.y+f.fh/2;const fs=Math.max(px(9),Math.min(f.fw,f.fh)*0.12);
       return`<path class="noback" d="${d}"/>${f.fw>fs*4?`<text x="${r3(cx)}" y="${r3(cy)}" text-anchor="middle" font-size="${r3(fs)}" fill="#7a848b" font-family="Google Sans,Noto Sans Hebrew,Arial">אין צד B</text>`:''}`}
-    return`<use href="#art-${it.id}_b" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/><path class="bk" d="${d}"/>`}).join('');
+    /* like the print file: the full bleed first, then each page again inside its own cell, so a neighbour's bleed does not cover it */
+    const fl=S.nest.flipAxis==='h'?([x,y])=>[x,H-y]:([x,y])=>[W-x,y];const cell=bleedCell(sh,p).map(P=>P.map(fl));const u=`<use href="#art-${it.id}_b" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`;
+    bkClips+=`<clipPath id="bc-${p.pid}" clipPathUnits="userSpaceOnUse">${cell.map(P=>`<path d="${dPts(P,true)}"/>`).join('')}</clipPath>`;bkNet+=`<g clip-path="url(#bc-${p.pid})">${u}</g>`;bkLines+=cell.map(P=>`<path class="bk" d="${dPts(P,true)}"/>`).join('');
+    return u}).join('');
   const Fs=S.nest.flipAxis==='h'?[1,0,0,-1,0,H]:[-1,0,0,1,W,0];const ga=Math.max(0,Math.min(1,(S.ghostA??40)/100));let ghost='',ghostDefs='';
   if(ga>0){ghostDefs=used.map(symbolFor).join('');
     ghost=`<g opacity="${ga}" style="pointer-events:none">`+sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const M=cmp(Fs,pmat(it,p));
       return`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`}).join('')+`</g>`+
       sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
-  svg.innerHTML=`<defs>${defs}${ghostDefs}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${pls}${ghost}${dplusSVG(sh,W,H,'B')}`;
+  svg.innerHTML=`<defs>${defs}${ghostDefs}${bkClips}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${pls}${bkNet}${bkLines}${ghost}${dplusSVG(sh,W,H,'B')}`;
   $('#ghostR').value=S.side==='B'?100-(S.ghostA??40):(S.ghostA??40);$('#ghostV').textContent=(S.ghostA??40)+'%';$('#status').innerHTML=`<b>צד B</b> · תצוגת מראה (הגיליון מתהפך סביב ${S.nest.flipAxis==='h'?'ציר אופקי':'ציר אנכי'}) · לעריכה חזרי לצד A${missing?` · <span class="bad">${missing} פריטים בלי צד B</span>`:''}`;
   $('#ftb').hidden=true;renderToolbar();updZoomUI()}
 if(!S.spotHide)S.spotHide={};
