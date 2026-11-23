@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="285">
+<meta name="app-version" content="286">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -2416,6 +2416,11 @@ function renderSettings(){renderMarksSummary();renderShapes();
       return`<div class="small" style="margin-top:8px"><b>שוליים (ס״מ)</b></div><div class="mgrid"><label>למעלה<input type="number" min="0" step="0.1" data-sz="mt" value="${v('mt')}"></label><label>למטה<input type="number" min="0" step="0.1" data-sz="mb" value="${v('mb')}"></label><label>ימין<input type="number" min="0" step="0.1" data-sz="mr" value="${v('mr')}"></label><label>שמאל<input type="number" min="0" step="0.1" data-sz="ml" value="${v('ml')}"></label></div>
       ${mk>0&&(q.t>+v('mt')*10+0.01||q.b>+v('mb')*10+0.01||q.l>+v('ml')*10+0.01||q.r>+v('mr')*10+0.01)?`<div class="mnote" style="margin-top:6px">נקודות החיתוך שומרות <b>${fmt(Math.round(mk)/10)} ס״מ</b> למעלה ולמטה${q.l>+v('ml')*10+0.01||q.r>+v('mr')*10+0.01?' וגם בצדדים (יש נקודות לאורך הצד)':''}. בצדדים העבודה יכולה להגיע עד השוליים.</div>`:''}
       <div class="small muted" style="margin-top:6px">שטח עבודה בפועל: <b dir="ltr" style="unicode-bidi:isolate;color:var(--ink)">${fmt(Math.round(A.w)/10)} × ${fmt(Math.round(A.h)/10)}</b> ס״מ</div>`})()}
+    ${sheetBack(sh)?(()=>{const b=Object.assign(bsDef(),sh.bShift||{});return`<div class="rectrow" style="margin:8px 0"><label class="chk"><input type="checkbox" data-bs="on" ${b.on?'checked':''}><b>הזזת צד B</b><span class="small muted">· סטיית מכונה</span></label>
+      ${b.on?`<div class="grid2"><label class="field">ימין / שמאל (מ״מ)<span class="row" style="gap:4px;flex-wrap:nowrap"><input type="number" min="0" step="0.1" data-bs="x" value="${fmt(+b.x||0)}"><select data-bs="xd"><option value="L" ${b.xd!=='R'?'selected':''}>שמאלה</option><option value="R" ${b.xd==='R'?'selected':''}>ימינה</option></select></span></label>
+      <label class="field">למעלה / למטה (מ״מ)<span class="row" style="gap:4px;flex-wrap:nowrap"><input type="number" min="0" step="0.1" data-bs="y" value="${fmt(+b.y||0)}"><select data-bs="yd"><option value="D" ${b.yd!=='U'?'selected':''}>למטה</option><option value="U" ${b.yd==='U'?'selected':''}>למעלה</option></select></span></label></div>
+      <div class="small muted">כל צד B (הגרפיקה ופלוס הבדיקה) זז בקובץ ההדפסה, כפי שרואים את צד B. צד A וקובץ החיתוך לא משתנים.</div>
+      <div class="row"><button class="btn sm" data-bs="all">החל על כל הגיליונות הדו־צדדיים</button></div>`:''}</div>`})():''}
     <div class="row"><button class="btn sm" data-sz="all">החל את הגודל על כל הגיליונות</button>${roll&&sh.len?'<button class="btn sm" data-sz="autolen">אורך אוטומטי</button>':''}</div>${m.note?`<div class="mnote">📌 ${esc(m.note)}</div>`:''}</div>`}}}
   const opts=S.media.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','he',{numeric:true})).map(m=>`<option value="${m.id}">${esc(m.name)} · ${m.type==='roll'?`גליל ${fmt(m.w/10)} ס״מ`:`${fmt(m.w/10)}×${fmt(m.h/10)} ס״מ`}</option>`).join('');
   $('#activeMedia').innerHTML=opts;$('#activeMedia').value=(curSheet()&&curSheet().mediaId)||S.active;
@@ -2501,6 +2506,10 @@ function backMat(it,p,W,H){const b=box(it);const M=pmat(it,p);
   return cmp([-1,0,0,1,W,0],cmp(M,[-1,0,0,1,b.PW,0]))}
 const anyBack=()=>S.items.some(it=>it.back);
 const sheetBack=sh=>!!sh&&sh.duplex!==false&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back});
+/* machine offset of side B: when ticked on a sheet, all of side B (art, plus marks) is printed moved by a fixed amount, to make up for the press.
+   Values are as side B is seen (page 2 of the print file). Off unless ticked. */
+const bsDef=()=>Object.assign({x:4,xd:'L',y:0,yd:'D'},S.cfg.bShift||{});
+function bShiftOf(sh){const b=sh&&sh.bShift;if(!b||!b.on||!sheetBack(sh))return[0,0];return[(b.xd==='R'?1:-1)*(+b.x||0),(b.yd==='U'?-1:1)*(+b.y||0)]}
 function symbolFor(it){const[t,,,l]=it.trim;const b=box(it);const vb=[l-b.bl/it.sx,t-b.bt/it.sy,b.PW/it.sx,b.PH/it.sy].map(r3);
   return`<symbol id="art-${it.id}" viewBox="${vb.join(' ')}" preserveAspectRatio="none"><image href="${artSrc(it)}" x="0" y="0" width="${r3(it.ow)}" height="${r3(it.oh)}" preserveAspectRatio="none"/></symbol>`}
 function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;const px=v=>v/scale;
@@ -2519,8 +2528,8 @@ function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;co
     ghost=`<g opacity="${ga}" style="pointer-events:none">`+sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const M=cmp(Fs,pmat(it,p));
       return`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`}).join('')+`</g>`+
       sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
-  svg.innerHTML=`<defs>${defs}${ghostDefs}${bkClips}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${pls}${bkNet}${bkLines}${ghost}${dplusSVG(sh,W,H,'B')}`;
-  $('#ghostR').value=(S.ghostA??40);$('#ghostV').textContent=(S.ghostA??40)+'%';$('#status').innerHTML=`<b>צד B</b> · תצוגת מראה (הגיליון מתהפך סביב ${S.nest.flipAxis==='h'?'ציר אופקי':'ציר אנכי'}) · לעריכה חזרי לצד A${missing?` · <span class="bad">${missing} פריטים בלי צד B</span>`:''}`;
+  svg.innerHTML=`<defs>${defs}${ghostDefs}${bkClips}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${(()=>{const[dx,dy]=bShiftOf(sh);const g=`${pls}${bkNet}${bkLines}`;return dx||dy?`<g transform="translate(${r3(dx)} ${r3(dy)})">${g}${dplusSVG(sh,W,H,'B')}</g>${ghost}`:`${g}${ghost}${dplusSVG(sh,W,H,'B')}`})()}`;
+  $('#ghostR').value=(S.ghostA??40);$('#ghostV').textContent=(S.ghostA??40)+'%';$('#status').innerHTML=`<b>צד B</b> · תצוגת מראה (הגיליון מתהפך סביב ${S.nest.flipAxis==='h'?'ציר אופקי':'ציר אנכי'}) · לעריכה חזרי לצד A${(()=>{const[dx,dy]=bShiftOf(sh);return dx||dy?` · <b style="color:#b45309">צד B מוזז ${[dx?fmt(Math.abs(dx))+' מ״מ '+(dx<0?'שמאלה':'ימינה'):'',dy?fmt(Math.abs(dy))+' מ״מ '+(dy<0?'למעלה':'למטה'):''].filter(Boolean).join(' ו־')}</b>`:''})()}${missing?` · <span class="bad">${missing} פריטים בלי צד B</span>`:''}`;
   $('#ftb').hidden=true;renderToolbar();updZoomUI()}
 if(!S.spotHide)S.spotHide={};
 function sheetPaths(it,M){const b=box(it);const out=[];const net=[[b.bl,b.bt],[b.bl+b.netW,b.bt],[b.bl+b.netW,b.bt+b.netH],[b.bl,b.bt+b.netH]].map(([u,v])=>ap(M,u,v));
@@ -3007,6 +3016,10 @@ function setSheetMedia(id){snap();for(const x of S.sheets)if(!x.mediaId)x.mediaI
   saveSettings();renderAll();if(sh)toast(`גיליון ${S.cur+1} עבר ל${mediaOf(sh).name}. גיליונות חדשים ייפתחו על המדיה הזו.`)}
 $('#activeMedia').addEventListener('change',e=>setSheetMedia(e.target.value));
 $('#curSheetBox').addEventListener('click',e=>{const kb=e.target.closest('[data-szkind]');if(kb){S.subKindPick=kb.dataset.szkind;renderSettings();return}const b=e.target.closest('[data-shq]');const sh=curSheet();if(!b||!sh)return;snap();sh.qty=Math.max(1,shQty(sh)+(+b.dataset.shq));renderAll()});
+$('#curSheetBox').addEventListener('change',e=>{const bs=e.target.dataset.bs;if(bs){const sh=curSheet();if(!sh)return;snap();const b=sh.bShift=Object.assign(bsDef(),sh.bShift||{});
+    if(bs==='on')b.on=e.target.checked;else if(bs==='x'||bs==='y')b[bs]=Math.max(0,parseFloat(e.target.value)||0);else b[bs]=e.target.value;
+    if(bs!=='on'){S.cfg.bShift={x:b.x,xd:b.xd,y:b.y,yd:b.yd};saveSettings()}renderAll();return}});
+$('#curSheetBox').addEventListener('click',e=>{const bb=e.target.closest('button[data-bs="all"]');if(!bb)return;const sh=curSheet();if(!sh||!sh.bShift)return;snap();let n=0;for(const x of S.sheets)if(x!==sh&&sheetBack(x)){x.bShift=Object.assign({},sh.bShift);n++}renderAll();toast(n?`הזזת צד B הוחלה על עוד ${n} גיליונות`:'אין עוד גיליונות דו־צדדיים')});
 $('#curSheetBox').addEventListener('change',e=>{const k=e.target.dataset.sz;const sh=curSheet();if(!k||!sh)return;if(k==='qty'){snap();sh.qty=Math.max(1,parseInt(e.target.value)||1);renderAll();return}if(/^m[tblr]$/.test(k)){const v=parseFloat(e.target.value);if(!(v>=0))return;snap();if(!sh.mediaId)sh.mediaId=S.active;sh.ov=Object.assign({},sh.ov||{},{[k]:Math.round(v*100)/10});sh.manual=true;delete sh.mk;renderAll();return}if(k==='sub'){S.subKindPick=null;const b=S.subs.find(x=>x.id===e.target.value);const sz=S.media.filter(x=>x.sub===e.target.value);const pick=sz.find(x=>x.def)||sz[0];if(pick){applySubSettings(b);setSheetMedia(pick.id)}return}if(k==='size'){applySubSettings(subOf(mediaById(e.target.value)));setSheetMedia(e.target.value);return}if(k==='len'){const v=parseFloat(e.target.value);if(!(v>0))return;snap();const m=mediaOf(sh);sh.len=Math.min(+m.h,Math.round(v*100)/10);sh.manual=true;renderAll();return}const v=parseFloat(e.target.value);if(!(v>0))return;snap();if(!sh.mediaId)sh.mediaId=S.active;sh.ov=Object.assign({},sh.ov||{},{[k]:Math.round(v*100)/10});sh.manual=true;renderAll()});
 $('#curSheetBox').addEventListener('click',e=>{const sh=curSheet();if(!sh)return;const k=(e.target.closest('button[data-sz]')||{}).dataset;if(!k||!k.sz)return;snap();
   if(k.sz==='swap'){const m=mediaOf(sh);if(!sh.mediaId)sh.mediaId=S.active;sh.ov=Object.assign({},sh.ov||{},{w:+m.h,h:+m.w});sh.manual=true;delete sh.mk;toast(`הגיליון עכשיו ${fmt(m.h/10)} × ${fmt(m.w/10)} ס״מ`)}
@@ -3373,7 +3386,7 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
       {const MK=mkOf(sh);if(MK.on||(sh.xdots&&sh.xdots.length)||lineSets().some(l=>lnOn(l,sh)))for(const[cx,cy]of sheetMarks(sh,W,H))pg.drawCircle({x:cx*K,y:(H-cy)*K,size:MK.d/2*K,color:rgb(0,0,0)})}
       if(kind==='print')await drawTextMarks(out,pg,sh,W,H,K);
       if(kind==='print')dplusPdf(pg,sh,W,H,K,'A');
-      if(kind==='print'&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back})){backPages++;const pb=out.addPage([W*K,H*K]);const backNet=[];
+      if(kind==='print'&&sh.placements.some(p=>{const it=itemById(p.iid);return it&&it.back})){backPages++;const pb=out.addPage([W*K,H*K]);const backNet=[];const[bsx,bsy]=bShiftOf(sh);if(bsx||bsy)pb.pushOperators(L.pushGraphicsState(),L.concatTransformationMatrix(1,0,0,1,bsx*K,-bsy*K));
         for(const p of sh.placements){const it=itemById(p.iid);if(!it||!it.back)continue;const bp=backProxy(it);const b=box(it);const M=backMat(it,p,W,H);const e=await embedFor(bp);
           const key=PDFName.of('Lx'+(++xc));pb.node.setXObject(key,e.obj.ref);const P=(u,v)=>{const q=ap(M,u,v);return[q[0]*K,(H-q[1])*K]};
           const mat=artMat(e,bp,b,P);
@@ -3382,7 +3395,7 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
           const fl=S.nest.flipAxis==='h'?([x,y])=>[x,H-y]:([x,y])=>[W-x,y];backNet.push({key,mat,polys:bleedCell(sh,p).map(poly=>poly.map(fl))})}
         for(const np of backNet){const ops=[L.pushGraphicsState()];for(const poly of np.polys){poly.forEach(([x,y],i)=>{const q=[x*K,(H-y)*K];ops.push(i?L.lineTo(q[0],q[1]):L.moveTo(q[0],q[1]))});ops.push(L.closePath())}
           ops.push(L.clip(),L.endPath(),L.concatTransformationMatrix(...np.mat),L.drawObject(np.key),L.popGraphicsState());pb.pushOperators(...ops)}
-        dplusPdf(pb,sh,W,H,K,'B');}}
+        dplusPdf(pb,sh,W,H,K,'B');if(bsx||bsy)pb.pushOperators(L.popGraphicsState());}}
     const bytes=await out.save();busy(false);
     const fname=`${base||'layout'}${opts.suffix||''}_${kind}.pdf`;
     if(opts.collect){opts.collect.push({name:fname,bytes:new Uint8Array(bytes)});return true}
