@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="286">
+<meta name="app-version" content="287">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -470,9 +470,10 @@ input[type=number]{width:78px;text-align:left;direction:ltr;font-family:var(--f-
           <label for="mkG">מרחק הנקודה מהגרפיקה (ס״מ)</label><input data-cm type="number" id="mkG" min="0" step="0.5">
           <label for="mkO">מרחק מרכז הנקודה מקצה הגיליון (ס״מ)</label><input data-cm type="number" id="mkO" min="1" step="0.5">
           <label for="mkFifth">נקודה חמישית (לזיהוי כיוון)</label><input type="checkbox" id="mkFifth" class="chk">
-          <label for="mkF">נקודה חמישית: מרחק מהנקודה הימנית התחתונה (ס״מ)</label><input data-cm type="number" id="mkF" min="5" step="1">
+          <label for="mkCorner">מיקום הזוג (פינה + נקודה חמישית)</label><select id="mkCorner"><option value="BR">ימין למטה</option><option value="TR">ימין למעלה</option><option value="BL">שמאל למטה</option><option value="TL">שמאל למעלה</option></select>
+          <label for="mkF">נקודה חמישית: מרחק מנקודת הפינה (ס״מ)</label><input data-cm type="number" id="mkF" min="5" step="1">
           <label for="mkDir">כיוון הנקודה החמישית</label>
-          <select id="mkDir"><option value="h">אופקי (שמאלה)</option><option value="v">אנכי (למעלה)</option></select>
+          <select id="mkDir"><option value="h">אופקי (בשורה)</option><option value="v">אנכי (בטור)</option></select>
           <label for="mkC">מרווח בין הסימנים לעבודה (ס״מ)</label><input data-cm type="number" id="mkC" min="0" step="1">
         </div>
         <div class="mark-prev" id="markPrev"></div>
@@ -1052,7 +1053,7 @@ function mkOf0(sh){const sb=sh&&S.subs&&subOf(mediaOf(sh));const pid=sh&&(sh.dot
   if(sh.dotsPid==='none')return Object.assign({},S.marks,{on:false});const p=(S.marks.presets||[]).find(x=>x.id===sh.dotsPid);return p?Object.assign({},S.marks,{fifth:true,dist:0},presetVals(p),{on:true}):S.marks}
 /* corner dots only need a strip at the top and bottom; the left/right strips are kept only when dots run along those sides */
 function inset4(m,sh){const mg=+m.margin||0;const M=mkOf(sh);const mk=M.on?(mkArt(M)?(+M.gap||0)+M.d+2:M.o+M.d/2+M.clear):0;
-  let mkL=0,mkR=0;if(M.on){if(+M.dist>0){mkL=mkR=mk}if(M.fifth!==false&&M.dir==='v')mkR=mk}
+  let mkL=0,mkR=0;if(M.on){if(+M.dist>0){mkL=mkR=mk}if(M.fifth!==false&&M.dir==='v'){if((M.corner||'BR')[1]==='L')mkL=mk;else mkR=mk}}
   if(sh&&S.marks&&S.marks.lines)for(const l0 of S.marks.lines){if(!lnOn(l0,sh))continue;const l=lnEff(l0,sh);const sd=l.sides||{};const need=(+l.o||8)+(+l.d||6)/2+(+M.clear||0);if(sd.l)mkL=Math.max(mkL,need);if(sd.r)mkR=Math.max(mkR,need)}
   const base=k=>m[k]!=null&&m[k]!==''?+m[k]:mg;return{t:Math.max(base('mt'),mk),b:Math.max(base('mb'),mk),l:Math.max(base('ml'),mkL),r:Math.max(base('mr'),mkR)}}
 function inset(m,sh){const q=inset4(m,sh);return Math.max(q.t,q.b)}
@@ -1095,10 +1096,10 @@ function artBox(sh){let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(co
 /* dot centres: from the sheet edge (o), or hugging the bounding box of all the artwork (gap between the art and the dot edge) */
 function markRect(W,H,M,bb){const o=M.o;if(!mkArt(M)||!bb)return{L:o,T:o,R:W-o,B:H-o};const g=(M.gap!=null&&M.gap!==''?+M.gap:5)+M.d/2;const mn=M.d/2+1;const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
   return{L:cl(bb.x0-g,mn,W-mn),T:cl(bb.y0-g,mn,H-mn),R:cl(bb.x1+g,mn,W-mn),B:cl(bb.y1+g,mn,H-mn)}}
-function markPts(W,H,M,bb){M=M||S.marks;const f=M.f;const Q=markRect(W,H,M,bb);const pts=[[Q.L,Q.T],[Q.R,Q.T],[Q.L,Q.B],[Q.R,Q.B]];if(M.fifth!==false)pts.push(M.dir==='v'?[Q.R,Q.B-f]:[Q.R-f,Q.B]);
+function markPts(W,H,M,bb){M=M||S.marks;const f=M.f;const Q=markRect(W,H,M,bb);const pts=[[Q.L,Q.T],[Q.R,Q.T],[Q.L,Q.B],[Q.R,Q.B]];if(M.fifth!==false){const c=M.corner||'BR';const cx=c[1]==='L'?Q.L:Q.R,cy=c[0]==='T'?Q.T:Q.B;const sx=c[1]==='L'?1:-1,sy=c[0]==='T'?1:-1;pts.push(M.dir==='v'?[cx,cy+sy*f]:[cx+sx*f,cy])}
   const dmax=+M.dist||0;if(dmax>0){const along=(a,b,fix,horiz)=>{const L=b-a;const n=Math.ceil(L/dmax);for(let k=1;k<n;k++){const v=a+L*k/n;pts.push(horiz?[v,fix]:[fix,v])}};along(Q.L,Q.R,Q.T,true);along(Q.L,Q.R,Q.B,true);along(Q.T,Q.B,Q.L,false);along(Q.T,Q.B,Q.R,false)}
   return pts}
-const MK_KEYS=['on','d','o','f','dir','clear','fifth','dist','ref','gap'];
+const MK_KEYS=['on','d','o','f','dir','corner','clear','fifth','dist','ref','gap'];
 function dotPresets(){if(S.marks.presets&&!S.marks.zundV2){S.marks.zundV2=1;S.marks.zundV1=1;const z=S.marks.presets.find(p=>/^zund$/i.test(p.name||''));if(z){Object.assign(z,{d:6,o:12,f:50,dir:'h',clear:8,fifth:true,dist:0});if(S.marks.pid===z.id)Object.assign(S.marks,{d:6,o:12,f:50,dir:'h',clear:8,fifth:true,dist:0});for(const sh of S.sheets)delete sh.mk}for(const p of S.marks.presets)p.dist=0;S.marks.dist=0}
   if(S.marks.presets&&!S.marks.zundV1){S.marks.zundV1=1;const z=S.marks.presets.find(p=>/^zund$/i.test(p.name||''));if(z){Object.assign(z,{d:6,o:12,f:50,dir:'h',clear:8,fifth:true,dist:0});if(S.marks.pid===z.id)Object.assign(S.marks,{d:6,o:12,f:50,dir:'h',clear:8,fifth:true,dist:0});for(const sh of S.sheets)delete sh.mk}}
   if(!S.marks.presets||!S.marks.presets.length){S.marks.zundV1=1;S.marks.zundV2=1;Object.assign(S.marks,{d:6,o:12,f:50,dir:'h',clear:8,fifth:true,dist:0});S.marks.presets=[{id:'mk1',name:'Zund',...Object.fromEntries(MK_KEYS.map(k=>[k,S.marks[k]]))}];S.marks.pid='mk1'}if(!S.marks.presets.some(p=>p.id===S.marks.pid))S.marks.pid=S.marks.presets[0].id;
@@ -1945,6 +1946,7 @@ function renderMarksSummary(){const el=$('#marksSummary');if(!el)return;const sh
       <div class="kv"><label>קוטר (ס״מ)</label><input data-cm type="number" step="0.5" data-ov="d" value="${v('d')}"><label>מרחק מהקצה (ס״מ)</label><input data-cm type="number" step="0.5" data-ov="o" value="${v('o')}">
       <label>נקודה חמישית</label><input type="checkbox" class="chk" data-ov="fifth" ${v('fifth')!==false?'checked':''}><label>מרחק החמישית (ס״מ)</label><input data-cm type="number" step="1" data-ov="f" value="${v('f')}">
       <label>כיוון החמישית</label><select data-ov="dir"><option value="h" ${v('dir')!=='v'?'selected':''}>אופקי</option><option value="v" ${v('dir')==='v'?'selected':''}>אנכי</option></select>
+      <label>מיקום הזוג</label><select data-ov="corner">${[['BR','ימין למטה'],['TR','ימין למעלה'],['BL','שמאל למטה'],['TL','שמאל למעלה']].map(([k,n])=>`<option value="${k}" ${(v('corner')||'BR')===k?'selected':''}>${n}</option>`).join('')}</select>
       <label>מרווח לעבודה (ס״מ)</label><input data-cm type="number" step="1" data-ov="clear" value="${v('clear')}"></div></div>`}
       if(selK==='dplus'&&sheetBack(sh)&&!sh.dplusOff){const{W,H}=sheetSize(sh);const P=dplusPts(sh,W,H);return`<div class="mkdet"><div class="row"><b style="flex:1">בדיקת דו־צדדי · בגיליון הזה</b><button class="btn sm" data-shm="refresh" title="מחזיר את הפלוסים למיקום האוטומטי">רענן</button></div>
       <div class="small muted">פלוס בצד A ופלוס חופף בדיוק בצד B. נכנס רק לקובץ ההדפסה. אפשר לגרור על הגיליון.</div>
@@ -1986,7 +1988,7 @@ $('#marksSummary').addEventListener('click',e=>{const sh=curSheet();if(!sh)retur
   if(b.dataset.shm==='refreshAll'){delete sh.mk;delete sh.dplus;if(sh.tmOv)for(const k of Object.keys(sh.tmOv)){const o=Object.assign({},sh.tmOv[k]);delete o.pos;delete o.dx;delete o.dy;sh.tmOv[k]=o}renderAll();toast('כל המארקים בגיליון עודכנו');return}
   if(b.dataset.shm==='dup'&&b.dataset.kind==='ln'){const src=lineSets().find(l=>l.id===b.dataset.id);if(src){const id=nid('ln');lineSets().push(Object.assign(JSON.parse(JSON.stringify(src)),{id,name:(src.name||'נקודות אורך')+' עותק',on:false,o:(+src.o||8)+(+src.d||6)*2}));sh.lnOn=Object.assign({},sh.lnOn||{},{[id]:true});delete sh.mk;saveSettings()}renderAll();return}
   if(b.dataset.shm==='dup'&&b.dataset.kind!=='tm'){const M=mkOf(sh);const srcOv=b.dataset.kind==='x'?((sh.xdots||[]).find(x=>x.id===b.dataset.id)||{}).ov:sh.dotsOv;const base=Object.assign({},M,srcOv||{});const id=nid('xd');
-      sh.xdots=(sh.xdots||[]).concat([{id,name:((activeDots()||{}).name||'נקודות')+' עותק',ov:{d:base.d,o:(+base.o||12)+(+base.d||5)*3,f:base.f,dir:base.dir,clear:base.clear,fifth:base.fifth,dist:base.dist}}]);delete sh.mk;S.shMkSel='x:'+id;renderAll();toast('נוסף סט נקודות נוסף בגיליון הזה. שני ערכים כדי למקם אותו');return}
+      sh.xdots=(sh.xdots||[]).concat([{id,name:((activeDots()||{}).name||'נקודות')+' עותק',ov:{d:base.d,o:(+base.o||12)+(+base.d||5)*3,f:base.f,dir:base.dir,corner:base.corner,clear:base.clear,fifth:base.fifth,dist:base.dist}}]);delete sh.mk;S.shMkSel='x:'+id;renderAll();toast('נוסף סט נקודות נוסף בגיליון הזה. שני ערכים כדי למקם אותו');return}
   if(b.dataset.shm==='dup'){const src=textMarks().find(t=>t.id===b.dataset.id);if(src){const eff=tmEff(src,sh);const id=nid('tm');const{W,H}=sheetSize(sh);const g=tmGeom(eff,W,H);
       textMarks().push(Object.assign(JSON.parse(JSON.stringify(src)),{id,name:(src.name||'מארק טקסט')+' עותק',on:false}));sh.tmOn=Object.assign({},sh.tmOn||{},{[id]:true});
       sh.tmOv=Object.assign({},sh.tmOv||{});sh.tmOv[id]=Object.assign({},(sh.tmOv&&sh.tmOv[src.id])||{},{dy:(+eff.dy||0)+g.sz*1.6});S.shMkSel=id;saveSettings();toast('המארק שוכפל בגיליון הזה. אפשר לגרור אותו או לשנות לו ערכים')}renderAll();return}
@@ -2425,7 +2427,7 @@ function renderSettings(){renderMarksSummary();renderShapes();
   const opts=S.media.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','he',{numeric:true})).map(m=>`<option value="${m.id}">${esc(m.name)} · ${m.type==='roll'?`גליל ${fmt(m.w/10)} ס״מ`:`${fmt(m.w/10)}×${fmt(m.h/10)} ס״מ`}</option>`).join('');
   $('#activeMedia').innerHTML=opts;$('#activeMedia').value=(curSheet()&&curSheet().mediaId)||S.active;
   syncMedia();if(!$('#mediaMgr').hidden)renderSubMgr();
-  $('#mkOn').checked=S.marks.on;{const md=$('#mkDef');if(md)md.checked=!!S.marks.defPid&&S.marks.defPid===S.marks.pid}$('#mkFifth').checked=S.marks.fifth!==false;$('#mkName').value=(activeDots()||{}).name||'';$('#mkD').value=S.marks.d;$('#mkO').value=S.marks.o;$('#mkRef').value=S.marks.ref||'art';$('#mkG').value=S.marks.gap!=null?S.marks.gap:5;{const art=(S.marks.ref||'art')!=='edge';$('#mkG').closest('.kv')&&($('#mkG').disabled=!art,$('#mkO').disabled=art)}$('#mkF').value=S.marks.f;$('#mkDir').value=S.marks.dir;$('#mkC').value=S.marks.clear;
+  $('#mkOn').checked=S.marks.on;{const md=$('#mkDef');if(md)md.checked=!!S.marks.defPid&&S.marks.defPid===S.marks.pid}$('#mkFifth').checked=S.marks.fifth!==false;$('#mkName').value=(activeDots()||{}).name||'';$('#mkD').value=S.marks.d;$('#mkO').value=S.marks.o;$('#mkRef').value=S.marks.ref||'art';$('#mkG').value=S.marks.gap!=null?S.marks.gap:5;{const art=(S.marks.ref||'art')!=='edge';$('#mkG').closest('.kv')&&($('#mkG').disabled=!art,$('#mkO').disabled=art)}$('#mkF').value=S.marks.f;$('#mkDir').value=S.marks.dir;$('#mkCorner').value=S.marks.corner||'BR';$('#mkC').value=S.marks.clear;
   $('#gap').value=S.nest.gap;$('#allowRot').checked=S.nest.rot;$('#centerOn').checked=S.nest.center!==false;$('#snapOn').checked=S.nest.snap;$('#flipAxis').value=S.nest.flipAxis||'v';$('#splitSides').checked=S.nest.splitSides!==false;$('#pairOn').checked=S.nest.pair!==false;$('#shapeBleed').value=S.nest.shapeBleed;$('#cellSz').value=S.nest.cell;$('#dpi').value=S.dpi;
   $('#cutNames').value=S.cfg.cutNames;$('#creaseNames').value=S.cfg.creaseNames;$('#outCut').value=S.cfg.outCut;$('#outCrease').value=S.cfg.outCrease;$('#kissNames').value=S.cfg.kissNames||'';$('#outKiss').value=S.cfg.outKiss||'Kiss-cut';$('#spotInPrint').checked=S.cfg.spotInPrint;
   const W=300,H=200,o=S.marks.o,f=S.marks.f,r=Math.max(2.5,S.marks.d/2);const ins=o+S.marks.d/2+S.marks.clear;
@@ -2568,7 +2570,7 @@ function clipPolysSrc(it){const d=box(it).B/it.sx;return closedCuts(it).map(c=>o
 function missingDots(sh){const M=mkOf(sh);if(!M.on)return['אין נקודות חיתוך בגיליון'];if(mkArt(M)&&!sh.mk)return[];const{W,H}=sheetSize(sh);const pts=sheetMarks(sh,W,H);const R=Math.max(M.o*3,Math.min(W,H)*0.15);
   const C=[['שמאל עליון',0,0],['ימין עליון',W,0],['שמאל תחתון',0,H],['ימין תחתון',W,H]];const miss=[];const used=new Set();
   for(const[n,cx,cy]of C){let bi=-1,bd=Infinity;pts.forEach(([x,y],i)=>{if(used.has(i))return;const d=Math.hypot(x-cx,y-cy);if(d<bd){bd=d;bi=i}});if(bi>=0&&bd<=R)used.add(bi);else miss.push('נקודה '+n)}
-  const R5=Math.max((+M.f||50)*2.5,R);const has5=pts.some(([x,y],i)=>!used.has(i)&&Math.hypot(x-W,y-H)<=R5+M.o*2);if(!has5)miss.push('נקודה חמישית');return miss}
+  const R5=Math.max((+M.f||50)*2.5,R);const has5=pts.some(([x,y],i)=>!used.has(i)&&Math.hypot(x-((M.corner||'BR')[1]==='L'?0:W),y-((M.corner||'BR')[0]==='T'?0:H))<=R5+M.o*2);if(!has5)miss.push('נקודה חמישית');return miss}
 function outOfArea(sh){const a=viewArea(sh);const roll=mediaOf(sh).type==='roll';const A=areaOf(sh);const bad=new Set();for(const p of sh.placements){const f=foot(p);if(p.x<a.x-0.5||p.y<a.y-0.5||p.x+f.fw>a.x+a.w+0.5||(!roll&&p.y+f.fh>a.y+a.h+0.5)||(roll&&p.y+f.fh>(sh.len>0?a.y+a.h:A.y+A.h)+0.5))bad.add(p.pid)}return bad}
 /* user alert rules (settings): warn only, never block */
 function alertCfg(){const d={dots5:true,lw:{on:true,w:160,h:180},ll:{on:true,h:295},spot:true,open:true};const c=S.cfg.alerts=Object.assign({},d,S.cfg.alerts||{});c.lw=Object.assign({},d.lw,c.lw||{});c.ll=Object.assign({},d.ll,c.ll||{});return c}
@@ -3036,6 +3038,7 @@ bind('#mkG',t=>S.marks.gap=Math.max(0,parseFloat(t.value)||0));
 bind('#mkRef',t=>{S.marks.ref=t.value;renderMarksMgr()});
 bind('#mkF',t=>S.marks.f=Math.max(5,parseFloat(t.value)||50));
 bind('#mkDir',t=>S.marks.dir=t.value);
+bind('#mkCorner',t=>{S.marks.corner=t.value;for(const sh of S.sheets)delete sh.mk});
 bind('#mkC',t=>S.marks.clear=Math.max(0,parseFloat(t.value)||0));
 bind('#mkFifth',t=>{S.marks.fifth=t.checked;for(const sh of S.sheets)delete sh.mk});
 bind('#mkName',t=>{const p=activeDots();if(p)p.name=t.value||p.name;setTimeout(()=>{if(!$('#marksMgr').hidden)renderMarksMgr()},0)});
