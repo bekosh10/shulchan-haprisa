@@ -6,7 +6,7 @@
 </head>
 <body>
 <title>שולחן הפריסה</title>
-<meta name="app-version" content="287">
+<meta name="app-version" content="288">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&display=swap">
@@ -16,7 +16,7 @@
 :root{
   --bg:#e8ebed; --panel:#f6f7f8; --raise:#ffffff; --ink:#182024; --muted:#5a656d; --line:#d0d6da;
   --accent:#7b3fe4; --accent-ink:#ffffff; --accent-soft:rgba(123,63,228,.12);
-  --cut:#d10a85; --crease:#2fa65a; --kiss:#8a3ffc;
+  --cut:#d10a85; --crease:#2fa65a; --kiss:#8a3ffc; --vcut:#e8710a;
   --table:#d6dce0; --grid:rgba(24,32,36,.07); --sheet:#ffffff; --sheet-edge:#8f9ba3; --area:#7c8a92;
   --ok:#1b7a45; --ok-soft:rgba(27,122,69,.13); --warn:#a2650a; --warn-soft:rgba(162,101,10,.15); --bad:#c02828; --bad-soft:rgba(192,40,40,.14);
   --g-A:#2f6fb5; --g-B:#c2571a; --g-C:#2e8a6e; --g-D:#7a4fbf; --g-E:#a2366f; --g-F:#5f7d1f;
@@ -233,6 +233,7 @@ input[type=number]{width:78px;text-align:left;direction:ltr;font-family:var(--f-
 #svg .pl.locked .hit{cursor:default}
 #svg .cutl{fill:none;stroke:var(--cut);stroke-width:1;vector-effect:non-scaling-stroke;pointer-events:none}
 #svg .crs{fill:none;stroke:var(--crease);stroke-width:1;stroke-dasharray:5 3;vector-effect:non-scaling-stroke;pointer-events:none}
+#svg .vcl{fill:none;stroke:var(--vcut);stroke-width:1.4;vector-effect:non-scaling-stroke;pointer-events:none}
 #svg .kss{fill:none;stroke:var(--kiss);stroke-width:1;vector-effect:non-scaling-stroke;pointer-events:none}
 #svg .nofr{fill:none;stroke:var(--area);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;pointer-events:none}
 #svg .pl.sel .hit{fill:rgba(123,63,228,.14)}
@@ -546,9 +547,11 @@ input[type=number]{width:78px;text-align:left;direction:ltr;font-family:var(--f-
           <label for="cutNames">שמות ספוט של קו חיתוך</label><input type="text" id="cutNames">
           <label for="creaseNames">שמות ספוט של קו קיפול</label><input type="text" id="creaseNames">
           <label for="kissNames">שמות ספוט של חיתוך נשיקה (kiss-cut)</label><input type="text" id="kissNames">
+          <label for="vcutNames">שמות ספוט של V-CUT</label><input type="text" id="vcutNames">
           <label for="outCut">שם הספוט לחיתוך בקובץ שמייצאים</label><input type="text" id="outCut">
           <label for="outCrease">שם הספוט לקיפול בקובץ שמייצאים</label><input type="text" id="outCrease">
           <label for="outKiss">שם הספוט לחיתוך נשיקה בקובץ שמייצאים</label><input type="text" id="outKiss">
+          <label for="outVcut">שם הספוט ל-V-CUT בקובץ שמייצאים</label><input type="text" id="outVcut">
           <label for="spotInPrint">להוסיף את קווי החיתוך גם לקובץ ההדפסה</label><input type="checkbox" id="spotInPrint">
         </div>
         <p class="hint">שמות מופרדים בפסיק. אין הבדל בין אותיות גדולות וקטנות, רווחים ומקפים.</p>
@@ -1010,7 +1013,7 @@ const S={fileOpen:{},
   marks:{on:true,d:6,o:12,f:50,dir:'h',clear:8,fifth:true,dist:0,ref:'art',gap:5},
   nest:{gap:0,rot:true,group:true,cell:0,shapeBleed:3,snap:true,flipAxis:'v',splitSides:true},side:'A',
   dpi:150,
-  cfg:{cutNames:'Cut, CutContour, Thru-cut, ThruCut, Die, DieCut, Contour',creaseNames:'Crease, Creasing, Fold, Rill, Score',kissNames:'Kiss-cut, KissCut, Kiss, Half-cut, HalfCut',keepSpotNames:'',cmykNames:'',outCut:'Cut',outCrease:'Crease',outKiss:'Kiss-cut',spotInPrint:false},
+  cfg:{cutNames:'Cut, CutContour, Thru-cut, ThruCut, Die, DieCut, Contour',creaseNames:'Crease, Creasing, Fold, Rill, Score',kissNames:'Kiss-cut, KissCut, Kiss, Half-cut, HalfCut',keepSpotNames:'',cmykNames:'',outCut:'Cut',outCrease:'Crease',outKiss:'Kiss-cut',vcutNames:'V-CUT, VCut, V-Groove, VGroove',outVcut:'V-CUT',spotInPrint:false},
   spotMap:{},
   unit:'cm',wire:false
 };
@@ -1020,7 +1023,7 @@ try{const s=JSON.parse(localStorage.getItem(KEY)||'null');
 }catch(e){}
 if(!S.nest.gapV2){S.nest.gap=0;S.nest.gapV2=1}if(S.nest.defBleed==null)S.nest.defBleed=3;
 if(!S.media.some(m=>m.id===S.active))S.active=S.media[0].id;
-function normCfg(){if(!S.cfg.outCut||/^(cut|cutcontour)$/i.test(S.cfg.outCut))S.cfg.outCut='Cut';if(!S.cfg.outCrease||/^crease$/i.test(S.cfg.outCrease))S.cfg.outCrease='Crease';if(!S.cfg.outKiss||/^kiss-?cut$/i.test(S.cfg.outKiss))S.cfg.outKiss='Kiss-cut'}normCfg();if(!S.cfg.kissNames)S.cfg.kissNames='Kiss-cut, KissCut, Kiss, Half-cut, HalfCut';
+function normCfg(){if(!S.cfg.outCut||/^(cut|cutcontour)$/i.test(S.cfg.outCut))S.cfg.outCut='Cut';if(!S.cfg.outCrease||/^crease$/i.test(S.cfg.outCrease))S.cfg.outCrease='Crease';if(!S.cfg.outKiss||/^kiss-?cut$/i.test(S.cfg.outKiss))S.cfg.outKiss='Kiss-cut';if(!S.cfg.outVcut)S.cfg.outVcut='V-CUT';if(S.cfg.vcutNames==null)S.cfg.vcutNames='V-CUT, VCut, V-Groove, VGroove'}normCfg();if(!S.cfg.kissNames)S.cfg.kissNames='Kiss-cut, KissCut, Kiss, Half-cut, HalfCut';
 S.cfg.cutNames=S.cfg.cutNames.split(',').map(x=>x.trim()).filter(x=>x&&!/^kiss/i.test(x.replace(/[\s_-]/g,''))).join(', ');
 for(const m of S.media){const n=+String(m.id).replace(/\D/g,'');if(n>=uid)uid=n+1}
 /* shared library (materials & sizes) kept in the artifact's db so it is the same on every device */
@@ -1070,7 +1073,8 @@ function sidesOnSheet(it,rot,fx,fy){const sd=spaceSides(it);if(!spUnlocked(it))r
 function spaceXY(it,rot,fx,fy){if(!spUnlocked(it)){const s=spacing0(it);return[s,s]}const[t,r,b,l]=sidesOnSheet(it,rot,fx,fy);return[l+r,t+b]}
 function spacing(it){if(!spUnlocked(it))return spacing0(it);const[t,r,b,l]=spaceSides(it);return Math.max(l+r,t+b)}
 function kOf(it,cell,rot,fx,fy,pair){if(!spUnlocked(it))return Math.ceil(spacing0(it)/2/cell-1e-6);let[t,r,b,l]=sidesOnSheet(it,rot,fx,fy);if(pair){t=b=Math.max(t,b);l=r=Math.max(l,r)}const c=v=>Math.ceil(v/cell-1e-6);return{t:c(t),r:c(r),b:c(b),l:c(l)}}
-function ctype(c){if(c.spot&&S.spotMap[c.spot]){const v=S.spotMap[c.spot];return['cut','kiss','crease'].includes(v)?v:null}return['cut','kiss','crease'].includes(c.type)?c.type:null}
+const CUT_ROLES=['cut','kiss','crease','vcut'];
+function ctype(c){if(c.spot&&S.spotMap[c.spot]){const v=S.spotMap[c.spot];return CUT_ROLES.includes(v)?v:null}return CUT_ROLES.includes(c.type)?c.type:null}
 function hasCut(it){return!!(it.contours&&it.contours.some(c=>ctype(c)==='cut'))}
 function shapeMode(it){return it.cutMode==='shape'&&hasCut(it)}
 function isShape(it){return shapeMode(it)&&!it.frame}
@@ -1622,13 +1626,12 @@ function readDpi(u8){try{
       if(mk===0xE0&&u8[o+4]===0x4A&&u8[o+5]===0x46&&u8[o+6]===0x49&&u8[o+7]===0x46){const units=u8[o+11];const xd=u8[o+12]<<8|u8[o+13];if(units===1)return xd;if(units===2)return xd*2.54;return null}
       if(mk===0xDA)return null;o+=2+len}}
   }catch(e){}return null}
-function classify(names){const norm=s=>String(s).toLowerCase().replace(/[\s_\-]/g,'');const cut=S.cfg.cutNames.split(',').map(norm).filter(Boolean);const cr=S.cfg.creaseNames.split(',').map(norm).filter(Boolean);const ks=(S.cfg.kissNames||'').split(',').map(norm).filter(Boolean);
-  for(const n of names){if(cut.includes(norm(n)))return'cut'}for(const n of names){if(ks.includes(norm(n)))return'kiss'}for(const n of names){if(cr.includes(norm(n)))return'crease'}return null}
+function classify(names){const norm=s=>String(s).toLowerCase().replace(/[\s_\-]/g,'');const cut=S.cfg.cutNames.split(',').map(norm).filter(Boolean);const cr=S.cfg.creaseNames.split(',').map(norm).filter(Boolean);const ks=(S.cfg.kissNames||'').split(',').map(norm).filter(Boolean);const vc=(S.cfg.vcutNames||'').split(',').map(norm).filter(Boolean);
+  for(const n of names){if(vc.includes(norm(n)))return'vcut'}for(const n of names){if(cut.includes(norm(n)))return'cut'}for(const n of names){if(ks.includes(norm(n)))return'kiss'}for(const n of names){if(cr.includes(norm(n)))return'crease'}return null}
 /* roles: cut / kiss / crease (lines), ignore = stays a spot in print, cmyk = converted to process colour in print */
-const CUT_ROLES=['cut','kiss','crease'];
 function wordRole(n){const c=classify([n]);if(c)return c;const norm=s=>String(s).toLowerCase().replace(/[\s_\-]/g,'');const has=k=>(S.cfg[k]||'').split(',').map(norm).filter(Boolean).includes(norm(n));return has('cmykNames')?'cmyk':has('keepSpotNames')?'ignore':null}
 function nameRole(n){return S.spotMap[n]||wordRole(n)}
-const ROLE_LBL={cut:'Cut · חיתוך (צורה)',kiss:'Kiss-cut · חיתוך נשיקה',crease:'Crease · קיפול',ignore:'ספוט בהדפסה (להשאיר כספוט)',cmyk:'להמיר ל-CMYK בהדפסה',delete:'למחוק (לא בהדפסה ולא בחיתוך)'};
+const ROLE_LBL={cut:'Cut · חיתוך (צורה)',kiss:'Kiss-cut · חיתוך נשיקה',crease:'Crease · קיפול',vcut:'V-CUT',ignore:'ספוט בהדפסה (להשאיר כספוט)',cmyk:'להמיר ל-CMYK בהדפסה',delete:'למחוק (לא בהדפסה ולא בחיתוך)'};
 function spotOff(n){return!!n&&(S.spotHide&&S.spotHide[n]||S.spotMap[n]==='delete')}
 function contoursFrom(raw){const out=[];const groups=new Map();
   for(const p of raw.paths){let closed=p.closed;const pts=p.pts;if(!closed&&pts.length>2){const a=pts[0],b=pts[pts.length-1];if(Math.hypot(a[0]-b[0],a[1]-b[1])<0.6)closed=true}
@@ -1720,8 +1723,8 @@ async function askCut(fileName,items,batch){
   if(cutTexts.length)await modal('טקסט בצבע חיתוך',`<p>בקובץ <b>${esc(fileName)}</b> יש טקסט בצבע הספוט <b dir="ltr">${esc(cutTexts.join(', '))}</b>.</p><p>אי אפשר לחתוך טקסט כמו שהוא. צריך להמיר אותו לקווים (Create Outlines באילוסטרייטור, Convert to Curves בקורל) ולהעלות את הקובץ שוב.</p><p class="hint">עד אז הטקסט הזה לא ייכנס לקובץ החיתוך, וגם לא יודפס בקובץ ה-print.</p>`,[{v:'ok',label:'הבנתי',primary:true}]);
   const list=items.filter(hasCut);if(!list.length)return;
   const maxShapes=Math.max(...list.map(it=>cutGroups(it).length));
-  const cutSpots=new Set(),creaseSpots=new Set();for(const it of list)for(const c of it.contours||[]){const t=ctype(c);if(t==='cut'||t==='kiss')cutSpots.add(c.spot);if(t==='crease')creaseSpots.add(c.spot)}
-  const r=batch&&batch.all?{vals:batch.all}:await modal('נמצא קו חיתוך בקובץ',`<p>בקובץ <b>${esc(fileName)}</b> נמצא קו חיתוך בספוט <b>${esc([...cutSpots].join(', '))}</b>${creaseSpots.size?` וקו קיפול בספוט <b>${esc([...creaseSpots].join(', '))}</b>`:''}, ב-${list.length} מתוך ${items.length} עמודים. ${maxShapes>1?`יש עד ${maxShapes} צורות חיתוך בעמוד.`:'יש צורת חיתוך אחת בעמוד.'}</p>
+  const cutSpots=new Set(),creaseSpots=new Set(),vcSpots=new Set();for(const it of list)for(const c of it.contours||[]){const t=ctype(c);if(t==='cut'||t==='kiss')cutSpots.add(c.spot);if(t==='crease')creaseSpots.add(c.spot);if(t==='vcut')vcSpots.add(c.spot)}
+  const r=batch&&batch.all?{vals:batch.all}:await modal('נמצא קו חיתוך בקובץ',`<p>בקובץ <b>${esc(fileName)}</b> נמצא קו חיתוך בספוט <b>${esc([...cutSpots].join(', '))}</b>${creaseSpots.size?` וקו קיפול בספוט <b>${esc([...creaseSpots].join(', '))}</b>`:''}${vcSpots.size?` וקו V-CUT בספוט <b>${esc([...vcSpots].join(', '))}</b>`:''}, ב-${list.length} מתוך ${items.length} עמודים. ${maxShapes>1?`יש עד ${maxShapes} צורות חיתוך בעמוד.`:'יש צורת חיתוך אחת בעמוד.'}</p>
     <fieldset><legend>איך לסדר</legend>
       <label class="chk"><input type="radio" name="use" value="shape" checked> לפי צורת החיתוך (מומלץ)</label>
       <label class="chk"><input type="radio" name="use" value="rect"> להתעלם מהקו ולסדר כמלבן</label></fieldset>
@@ -2380,8 +2383,8 @@ function propsHTML(T){let html='';
     ${hasCut(it)?`<section class="psec">
       <div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חיתוך</h4><span class="small muted" style="flex:1">${(it.contours||[]).some(c=>ctype(c)==='crease')?'קו חיתוך וקיפול':'קו חיתוך'} · ${cutGroups(it).length} צורות${openCuts(it).length?` · <b style="color:var(--cut,#d33)">⚠ הקו לא סגור (פתח ${fmt(Math.round(Math.max(...openCuts(it).map(o=>o.gap))*10)/10)} מ״מ)</b>`:''}</span>${it.cutMode==='shape'?`<label class="fillchk vchk" title="${hasCut(it)?'מסגרת חיתוך מלבנית מסביב לבלוק':'מסגרת חיתוך מלבנית (בקובץ החיתוך)'}"><input type="checkbox" data-p="frame" ${it.frame?'checked':''}><span>מסגרת</span></label>`:''}${isShape(it)?`<label class="fillchk vchk" title="סידור קבוע לגאמפרים: אחד עומד ואחד הפוך ב-180°, משתלבים אחד בתוך השני. המרחק בין החלקים לפי &quot;מרווחים&quot;"><input type="checkbox" data-p="jmp" ${it.jmp?'checked':''}><span>גאמפר</span></label>`:''}</div>
         <select data-p="mode" id="p-mode" title="סידור"><option value="shape" ${it.cutMode==='shape'?'selected':''}>סידור: לפי צורת החיתוך</option><option value="rect" ${it.cutMode!=='shape'?'selected':''}>סידור: כמלבן (להתעלם מהקו)</option></select>
-        ${it.cutMode==='shape'&&cutGroups(it).length>1?'<button class="btn sm" data-pa="split">פרק לחלקים נפרדים</button>':''}</section>`:(()=>{const cs=(it.contours||[]).map(ctype).filter(Boolean);if(!cs.length)return'';const nk=cs.filter(t=>t==='kiss').length,nc=cs.filter(t=>t==='crease').length;
-      return`<section class="psec"><div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חיתוך</h4><span class="small muted" style="flex:1">${[nk?`${nk} קווי חיתוך נשיקה`:'',nc?`${nc} קווי קיפול`:''].filter(Boolean).join(' · ')} · נכנסים לקובץ החיתוך</span><label class="fillchk vchk" title="מסגרת חיתוך מלבנית מסביב לעמוד"><input type="checkbox" data-p="frame" ${it.frame!==false?'checked':''}><span>מסגרת</span></label></div></section>`})()}
+        ${it.cutMode==='shape'&&cutGroups(it).length>1?'<button class="btn sm" data-pa="split">פרק לחלקים נפרדים</button>':''}</section>`:(()=>{const cs=(it.contours||[]).map(ctype).filter(Boolean);if(!cs.length)return'';const nk=cs.filter(t=>t==='kiss').length,nc=cs.filter(t=>t==='crease').length,nv=cs.filter(t=>t==='vcut').length;
+      return`<section class="psec"><div class="cutrow" style="align-items:center"><h4 class="sizeh" style="align-self:center">חיתוך</h4><span class="small muted" style="flex:1">${[nk?`${nk} קווי חיתוך נשיקה`:'',nc?`${nc} קווי קיפול`:'',nv?`${nv} קווי V-CUT`:''].filter(Boolean).join(' · ')} · נכנסים לקובץ החיתוך</span><label class="fillchk vchk" title="מסגרת חיתוך מלבנית מסביב לעמוד"><input type="checkbox" data-p="frame" ${it.frame!==false?'checked':''}><span>מסגרת</span></label></div></section>`})()}
     `;
   }else{
     const cv=(fn,d)=>{const v=common(T,fn);return v===null?'':(d?d(v):v)};
@@ -2429,7 +2432,7 @@ function renderSettings(){renderMarksSummary();renderShapes();
   syncMedia();if(!$('#mediaMgr').hidden)renderSubMgr();
   $('#mkOn').checked=S.marks.on;{const md=$('#mkDef');if(md)md.checked=!!S.marks.defPid&&S.marks.defPid===S.marks.pid}$('#mkFifth').checked=S.marks.fifth!==false;$('#mkName').value=(activeDots()||{}).name||'';$('#mkD').value=S.marks.d;$('#mkO').value=S.marks.o;$('#mkRef').value=S.marks.ref||'art';$('#mkG').value=S.marks.gap!=null?S.marks.gap:5;{const art=(S.marks.ref||'art')!=='edge';$('#mkG').closest('.kv')&&($('#mkG').disabled=!art,$('#mkO').disabled=art)}$('#mkF').value=S.marks.f;$('#mkDir').value=S.marks.dir;$('#mkCorner').value=S.marks.corner||'BR';$('#mkC').value=S.marks.clear;
   $('#gap').value=S.nest.gap;$('#allowRot').checked=S.nest.rot;$('#centerOn').checked=S.nest.center!==false;$('#snapOn').checked=S.nest.snap;$('#flipAxis').value=S.nest.flipAxis||'v';$('#splitSides').checked=S.nest.splitSides!==false;$('#pairOn').checked=S.nest.pair!==false;$('#shapeBleed').value=S.nest.shapeBleed;$('#cellSz').value=S.nest.cell;$('#dpi').value=S.dpi;
-  $('#cutNames').value=S.cfg.cutNames;$('#creaseNames').value=S.cfg.creaseNames;$('#outCut').value=S.cfg.outCut;$('#outCrease').value=S.cfg.outCrease;$('#kissNames').value=S.cfg.kissNames||'';$('#outKiss').value=S.cfg.outKiss||'Kiss-cut';$('#spotInPrint').checked=S.cfg.spotInPrint;
+  $('#cutNames').value=S.cfg.cutNames;$('#creaseNames').value=S.cfg.creaseNames;$('#outCut').value=S.cfg.outCut;$('#outCrease').value=S.cfg.outCrease;$('#kissNames').value=S.cfg.kissNames||'';$('#outKiss').value=S.cfg.outKiss||'Kiss-cut';$('#vcutNames').value=S.cfg.vcutNames||'';$('#outVcut').value=S.cfg.outVcut||'V-CUT';$('#spotInPrint').checked=S.cfg.spotInPrint;
   const W=300,H=200,o=S.marks.o,f=S.marks.f,r=Math.max(2.5,S.marks.d/2);const ins=o+S.marks.d/2+S.marks.clear;
   $('#markPrev').innerHTML=`<svg viewBox="-8 -8 ${W+16} ${H+16}" width="100%" role="img" aria-label="תצוגת מיקום הסימנים">
     <rect x="0" y="0" width="${W}" height="${H}" fill="var(--sheet)" stroke="var(--sheet-edge)"/>
@@ -2529,7 +2532,7 @@ function renderBack(sh,W,H){const svg=$('#svg');const pad=Math.max(W,H)*0.025;co
   if(ga>0){ghostDefs=used.map(symbolFor).join('');
     ghost=`<g opacity="${ga}" style="pointer-events:none">`+sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const b=box(it);const M=cmp(Fs,pmat(it,p));
       return`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`}).join('')+`</g>`+
-      sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
+      sh.placements.map(p=>{const it=itemById(p.iid);if(!it)return'';const{paths}=sheetPaths(it,cmp(Fs,pmat(it,p)));return paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':c.type==='vcut'?'vcl':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')}).join('')}
   svg.innerHTML=`<defs>${defs}${ghostDefs}${bkClips}</defs><rect class="sheet" x="0" y="0" width="${r3(W)}" height="${r3(H)}"/>${(()=>{const[dx,dy]=bShiftOf(sh);const g=`${pls}${bkNet}${bkLines}`;return dx||dy?`<g transform="translate(${r3(dx)} ${r3(dy)})">${g}${dplusSVG(sh,W,H,'B')}</g>${ghost}`:`${g}${ghost}${dplusSVG(sh,W,H,'B')}`})()}`;
   $('#ghostR').value=(S.ghostA??40);$('#ghostV').textContent=(S.ghostA??40)+'%';$('#status').innerHTML=`<b>צד B</b> · תצוגת מראה (הגיליון מתהפך סביב ${S.nest.flipAxis==='h'?'ציר אופקי':'ציר אנכי'}) · לעריכה חזרי לצד A${(()=>{const[dx,dy]=bShiftOf(sh);return dx||dy?` · <b style="color:#b45309">צד B מוזז ${[dx?fmt(Math.abs(dx))+' מ״מ '+(dx<0?'שמאלה':'ימינה'):'',dy?fmt(Math.abs(dy))+' מ״מ '+(dy<0?'למעלה':'למטה'):''].filter(Boolean).join(' ו־')}</b>`:''})()}${missing?` · <span class="bad">${missing} פריטים בלי צד B</span>`:''}`;
   $('#ftb').hidden=true;renderToolbar();updZoomUI()}
@@ -2623,7 +2626,7 @@ function renderStage(){
     const art='';if(!S.wire){const u=`<use href="#art-${it.id}" width="${r3(b.PW)}" height="${r3(b.PH)}" transform="matrix(${M.map(r3).join(' ')})"/>`;artBleed+=u;
       netClips+=`<clipPath id="nc-${p.pid}" clipPathUnits="userSpaceOnUse">${bleedCell(sh,p).map(P=>`<path d="${dPts(P,true)}"/>`).join('')}</clipPath>`;artNet+=`<g clip-path="url(#nc-${p.pid})">${u}</g>`}
     const wf=S.wire==='lines'?` style="fill:transparent;stroke:none"`:S.wire?` style="fill:${it.color};fill-opacity:.62"`:'';
-    const lines=paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')+(it.frame===false&&!shapeMode(it)?`<path class="nofr" d="${dPts(net,true)}"/>`:'');
+    const lines=paths.filter(c=>!spotOff(c.spot)).map(c=>`<path class="${c.type==='crease'?'crs':c.type==='kiss'?'kss':c.type==='vcut'?'vcl':'cutl'}" d="${dPts(c.pts,c.closed)}"/>`).join('')+(it.frame===false&&!shapeMode(it)?`<path class="nofr" d="${dPts(net,true)}"/>`:'');
     let label='';if(S.wire===true){const fs=Math.max(px(7),Math.min(f.fw,f.fh)*0.075);const cx=p.x+f.fw/2,cy=p.y+f.fh/2;const per=Math.max(4,Math.floor(f.fw*0.86/(fs*0.56)));
       const words=it.name.split(/(\s+|_|-)/).filter(Boolean);const L=[];let cur='';for(const w of words){if((cur+w).length>per&&cur.trim()){L.push(cur.trim());cur=w.trim()?w:''}else cur+=w;while(cur.length>per){L.push(cur.slice(0,per));cur=cur.slice(per)}}if(cur.trim())L.push(cur.trim());
       const maxL=Math.max(1,Math.floor(f.fh*0.8/(fs*1.25)));let lines2=L.slice(0,maxL);if(L.length>maxL)lines2[maxL-1]=lines2[maxL-1].slice(0,Math.max(1,per-1))+'…';
@@ -2736,7 +2739,7 @@ function renderStrip(){
   for(const it of shIt)for(const c of it.contours||[]){if(!c.spot||/^(all|none)$/i.test(c.spot))continue;const e=ent(c.spot,c);e.n++;e.items.add(it.id)}
   for(const it of shIt)for(const nm of it.textSpots||[]){if(/^(all|none)$/i.test(nm))continue;const e=ent(nm);e.text=(e.text||0)+1;e.items.add(it.id)}
   for(const it of shIt)for(const nm of it.spots||[]){if(/^(all|none)$/i.test(nm))continue;const e=ent(nm);e.gfx=true;e.items.add(it.id)}
-  const ROLE={cut:[S.cfg.outCut||'Cut','חיתוך','var(--cut)'],crease:[S.cfg.outCrease||'Crease','קיפול','var(--crease)'],kiss:[S.cfg.outKiss||'Kiss-cut','חיתוך נשיקה','var(--kiss)'],ignore:['','ספוט בהדפסה','#9aa3ad'],cmyk:['','להמיר ל-CMYK','#2b8a9e'],delete:['','למחוק','#555']};
+  const ROLE={cut:[S.cfg.outCut||'Cut','חיתוך','var(--cut)'],crease:[S.cfg.outCrease||'Crease','קיפול','var(--crease)'],kiss:[S.cfg.outKiss||'Kiss-cut','חיתוך נשיקה','var(--kiss)'],vcut:[S.cfg.outVcut||'V-CUT','V-CUT','var(--vcut)'],ignore:['','ספוט בהדפסה','#9aa3ad'],cmyk:['','להמיר ל-CMYK','#2b8a9e'],delete:['','למחוק','#555']};
   const spTabs=`<div class="seg sptabs"><button data-sptab="sheet" aria-pressed="${spTab==='sheet'}">בגיליון</button><button data-sptab="page" aria-pressed="${spTab==='page'}" ${focusIt?'':'disabled title="בחרי עמוד כדי לראות את הספוטים שלו"'}>בעמוד</button></div>`;
   const spotHTML=`<div class="spot-h"><span>ספוטים ${spTab==='page'?'בעמוד':'בגיליון'} <span class="small muted" style="font-weight:400">${spots.size}</span></span><label class="small" style="font-weight:400;display:flex;align-items:center;gap:5px;cursor:pointer" title="להסתיר את הגרפיקה ולראות רק את קווי החיתוך"><input type="checkbox" data-cutonly ${S.wire==='lines'?'checked':''}>רק קווי חיתוך</label></div>`+spTabs+(spots.size?[...spots].map(([name,e])=>{const role=nameRole(name)||(CUT_ROLES.includes(e.c.type)?e.c.type:'ignore');const col=ROLE[role]?ROLE[role][2]:'var(--line)';
       return`<div class="spotrow"><input type="checkbox" class="spv" data-spotvis="${esc(name)}" ${S.spotHide[name]?'':'checked'} title="הצג בפריסה" aria-label="הצג את ${esc(name)} בפריסה"><span class="sw" style="background:${col}"></span><span class="sn" title="${esc(name)}">${esc(name)}</span>
@@ -2988,7 +2991,7 @@ const stripEl=$('.strip');
 stripEl.addEventListener('change',e=>{if(e.target.matches('[data-cutonly]')){S.wire=e.target.checked?'lines':false;saveSettings();renderSettings();renderStage();return}const v=e.target.closest('[data-spotvis]');if(v){S.spotHide[v.dataset.spotvis]=!v.checked;renderStage();return}const sel=e.target.closest('[data-spot]');if(!sel)return;snap();const name=sel.dataset.spot;const m=Object.assign({},S.spotMap);if(sel.value===wordRole(name))delete m[name];else m[name]=sel.value;S.spotMap=m;saveSettings();renderAll();toast(`הספוט ${name}: ${sel.options[sel.selectedIndex].text}`)});
 stripEl.addEventListener('click',e=>{if(e.target.closest('.srow')&&S.spotTab){S.spotTab=null;setTimeout(renderStrip,0)}const b=e.target.closest('[data-sptab]');if(!b||b.disabled)return;S.spotTab=b.dataset.sptab;renderStrip()});
 $('#mapBtn').addEventListener('click',async()=>{
-  const L=[['cutNames','Cut · חיתוך','קובע את צורת החיתוך של העמוד'],['kissNames','Kiss-cut · חיתוך נשיקה','קו בתוך העמוד, העמוד נשאר מלא'],['creaseNames','Crease · קיפול','קו בתוך העמוד, העמוד נשאר מלא'],['keepSpotNames','ספוט בהדפסה','נשאר ספוט בקובץ ההדפסה, לא נחתך'],['cmykNames','להמיר ל-CMYK','מודפס כצבע רגיל (CMYK) ולא כספוט']];
+  const L=[['cutNames','Cut · חיתוך','קובע את צורת החיתוך של העמוד'],['kissNames','Kiss-cut · חיתוך נשיקה','קו בתוך העמוד, העמוד נשאר מלא'],['creaseNames','Crease · קיפול','קו בתוך העמוד, העמוד נשאר מלא'],['vcutNames','V-CUT','קו V-CUT בקובץ החיתוך, בספוט בשם V-CUT'],['keepSpotNames','ספוט בהדפסה','נשאר ספוט בקובץ ההדפסה, לא נחתך'],['cmykNames','להמיר ל-CMYK','מודפס כצבע רגיל (CMYK) ולא כספוט']];
   const learned=Object.entries(S.spotMap||{}).sort((a,b)=>a[0].localeCompare(b[0]));
   const r=await modal('מנהל מיפויים',`<div dir="rtl" class="mapmgr"><p class="hint" style="margin-top:0">כל שם ספוט שמופיע כאן מזוהה אוטומטית כשמעלים קובץ, והחלון בהעלאה כבר מסמן לו את הבחירה. מפרידים בפסיק. אותיות גדולות/קטנות, רווחים, מקפים וקו תחתון לא משנים (Cut Contour = CutContour = cut-contour).</p>
     ${L.map(([k,t,h])=>`<label class="field mapf"><span><b>${t}</b> <span class="small muted">· ${h}</span></span><textarea name="${k}" rows="2" dir="ltr">${esc(S.cfg[k]||'')}</textarea></label>`).join('')}
@@ -3056,6 +3059,8 @@ bind('#creaseNames',t=>S.cfg.creaseNames=t.value);
 bind('#outCut',t=>S.cfg.outCut=t.value.trim()||'Cut');
 bind('#kissNames',t=>S.cfg.kissNames=t.value);
 bind('#outKiss',t=>S.cfg.outKiss=t.value.trim()||'Kiss-cut');
+bind('#vcutNames',t=>S.cfg.vcutNames=t.value);
+bind('#outVcut',t=>S.cfg.outVcut=t.value.trim()||'V-CUT');
 bind('#outCrease',t=>S.cfg.outCrease=t.value.trim()||'Crease');
 bind('#spotInPrint',t=>S.cfg.spotInPrint=t.checked);
 
@@ -3361,15 +3366,15 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
       return emb[it.id]=e};
     const useSpots=page=>{try{const ctx=out.context;
         if(!spotRefs){const mk=(nm,c)=>{const fn=ctx.obj({FunctionType:2,Domain:[0,1],C0:[0,0,0,0],C1:c,N:1});return ctx.register(ctx.obj([PDFName.of('Separation'),PDFName.of(nm),PDFName.of('DeviceCMYK'),fn]))};
-          spotRefs={cut:mk(S.cfg.outCut||'Cut',[0,1,0,0]),crease:mk(S.cfg.outCrease||'Crease',[0.7,0,0.8,0]),kiss:mk(S.cfg.outKiss||'Kiss-cut',[0.5,0.8,0,0])}}
+          spotRefs={cut:mk(S.cfg.outCut||'Cut',[0,1,0,0]),crease:mk(S.cfg.outCrease||'Crease',[0.7,0,0.8,0]),kiss:mk(S.cfg.outKiss||'Kiss-cut',[0.5,0.8,0,0]),vcut:mk(S.cfg.outVcut||'V-CUT',[0,0.6,1,0])}}
         let res=page.node.Resources();if(!res){res=ctx.obj({});page.node.set(PDFName.of('Resources'),res)}
         let cs=res.lookup(PDFName.of('ColorSpace'));if(!cs){cs=ctx.obj({});res.set(PDFName.of('ColorSpace'),cs)}
-        cs.set(PDFName.of('CSCut'),spotRefs.cut);cs.set(PDFName.of('CSCrease'),spotRefs.crease);cs.set(PDFName.of('CSKiss'),spotRefs.kiss);return true}catch(e){return false}};
+        cs.set(PDFName.of('CSCut'),spotRefs.cut);cs.set(PDFName.of('CSCrease'),spotRefs.crease);cs.set(PDFName.of('CSKiss'),spotRefs.kiss);cs.set(PDFName.of('CSVcut'),spotRefs.vcut);return true}catch(e){return false}};
     const drawCut=(page,H,paths)=>{if(!paths.length)return;const spot=useSpots(page);const T=([x,y])=>[x*K,(H-y)*K];
-      for(const type of['cut','kiss','crease']){const ps=paths.filter(c=>c.type===type);if(!ps.length)continue;
+      for(const type of['cut','kiss','crease','vcut']){const ps=paths.filter(c=>c.type===type);if(!ps.length)continue;
         const ops=[L.pushGraphicsState()];
-        if(spot)ops.push(PDFOperator.of('CS',[PDFName.of(type==='cut'?'CSCut':type==='kiss'?'CSKiss':'CSCrease')]),PDFOperator.of('SCN',[PDFNumber.of(1)]));
-        else ops.push(type==='cut'?L.setStrokingRgbColor(0.82,0.04,0.52):type==='kiss'?L.setStrokingRgbColor(0.54,0.25,0.99):L.setStrokingRgbColor(0.18,0.65,0.35));
+        if(spot)ops.push(PDFOperator.of('CS',[PDFName.of(type==='cut'?'CSCut':type==='kiss'?'CSKiss':type==='vcut'?'CSVcut':'CSCrease')]),PDFOperator.of('SCN',[PDFNumber.of(1)]));
+        else ops.push(type==='cut'?L.setStrokingRgbColor(0.82,0.04,0.52):type==='kiss'?L.setStrokingRgbColor(0.54,0.25,0.99):type==='vcut'?L.setStrokingRgbColor(0.91,0.44,0.04):L.setStrokingRgbColor(0.18,0.65,0.35));
         ops.push(L.setLineWidth(0.5));if(type==='crease')ops.push(L.setDashPattern([4,2],0));
         for(const c of ps){c.pts.forEach((p,i)=>{const q=T(p);ops.push(i?L.lineTo(q[0],q[1]):L.moveTo(q[0],q[1]))});if(c.closed)ops.push(L.closePath())}
         ops.push(L.stroke(),L.popGraphicsState());page.pushOperators(...ops)}};
@@ -3408,12 +3413,12 @@ async function exportPdf(kind,base,skipChecks,opts){opts=opts||{};const SHS=opts
 /* ---------- DXF (cut) ---------- */
 function sheetFileName(sh,base){if(!sh)return base||'layout';const t0=textMarks().find(t=>tmOn(t,sh)&&tmEff(t,sh).text);let n=t0?expandKw(tmEff(t0,sh).text,sh):'';n=n.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,120);return n||((base||'layout')+'_'+sheetLabel(sh))}
 function sheetLabel(sh){const i=S.sheets.indexOf(sh);const n=sh.code?S.sheets.filter(x=>x.code===sh.code).indexOf(sh)+1:i+1;return(sh.code?sh.code+'_':'')+String(n).padStart(2,'0')}
-function dxfFor(sh){const{W,H}=sheetSize(sh);const f=v=>(Math.round(v*1000)/1000).toString();const DL=S.cfg.dxfL||{};const L={cut:DL.cut||'Cut',crease:DL.crease||'Crease',kiss:DL.kiss||'Kiss-cut',marks:DL.marks||'Regmarks'};
-  const clean=n=>String(n).replace(/[<>\/\\":;?*|=,`]/g,'_')||'0';const lay={cut:clean(L.cut),crease:clean(L.crease),kiss:clean(L.kiss),marks:clean(L.marks)};const col={cut:1,crease:3,kiss:6,marks:7};
+function dxfFor(sh){const{W,H}=sheetSize(sh);const f=v=>(Math.round(v*1000)/1000).toString();const DL=S.cfg.dxfL||{};const L={cut:DL.cut||'Cut',crease:DL.crease||'Crease',kiss:DL.kiss||'Kiss-cut',vcut:DL.vcut||S.cfg.outVcut||'V-CUT',marks:DL.marks||'Regmarks'};
+  const clean=n=>String(n).replace(/[<>\/\\":;?*|=,`]/g,'_')||'0';const lay={cut:clean(L.cut),crease:clean(L.crease),kiss:clean(L.kiss),vcut:clean(L.vcut),marks:clean(L.marks)};const col={cut:1,crease:3,kiss:6,vcut:30,marks:7};
   const o=[];const g=(c,v)=>o.push(String(c),String(v));
   g(0,'SECTION');g(2,'HEADER');g(9,'$ACADVER');g(1,'AC1009');g(9,'$MEASUREMENT');g(70,1);g(9,'$EXTMIN');g(10,0);g(20,0);g(30,0);g(9,'$EXTMAX');g(10,f(W));g(20,f(H));g(30,0);g(0,'ENDSEC');
   g(0,'SECTION');g(2,'TABLES');g(0,'TABLE');g(2,'LTYPE');g(70,1);g(0,'LTYPE');g(2,'CONTINUOUS');g(70,0);g(3,'Solid line');g(72,65);g(73,0);g(40,0);g(0,'ENDTAB');
-  g(0,'TABLE');g(2,'LAYER');g(70,4);for(const k of['cut','crease','kiss','marks']){g(0,'LAYER');g(2,lay[k]);g(70,0);g(62,col[k]);g(6,'CONTINUOUS')}g(0,'ENDTAB');g(0,'ENDSEC');
+  g(0,'TABLE');g(2,'LAYER');g(70,5);for(const k of['cut','crease','kiss','vcut','marks']){g(0,'LAYER');g(2,lay[k]);g(70,0);g(62,col[k]);g(6,'CONTINUOUS')}g(0,'ENDTAB');g(0,'ENDSEC');
   g(0,'SECTION');g(2,'ENTITIES');
   const ALL=[];for(const p of sh.placements){const it=itemById(p.iid);if(!it)continue;const M=pmat(it,p);ALL.push(...sheetPaths(it,M).paths)}ALL.push(...rectCutPaths(sh));
   {const paths=mergeCutPaths(ALL);
@@ -3460,7 +3465,7 @@ $('#expBtn').addEventListener('click',async()=>{
     <fieldset class="exdxf" ${(ex.cutfmt||'pdf')==='pdf'?'hidden':''}><legend>שכבות ב-DXF</legend><div class="exnames">
       ${(()=>{const pres=new Set();let dots=false;for(const sh of S.sheets){for(const p of sh.placements){const it=itemById(p.iid);if(!it)continue;for(const c of sheetPaths(it,pmat(it,p)).paths)pres.add(c.type)}const MK=mkOf(sh);if(MK.on||(sh.xdots&&sh.xdots.length)||lineSets().some(l=>lnOn(l,sh)))dots=true}if(dots)pres.add('marks');
         const on=k=>!(S.cfg.dxfOff||{})[k];const row=(k,lbl,nm,def)=>`<label class="field exlay ${pres.has(k)?'':'exabsent'}" ${pres.has(k)?'':'hidden'}><span class="exlh"><input type="checkbox" name="on_${k}" ${on(k)?'checked':''}> ${lbl}</span><input type="text" dir="ltr" name="${nm}" value="${esc(DL[k]||def)}"></label>`;
-        return row('cut','חיתוך','nCut','Cut')+row('crease','קיפול','nCrease','Crease')+row('kiss','חיתוך נשיקה','nKiss','Kiss-cut')+row('marks','נקודות (מארקים)','nMarks','Regmarks')})()}</div>
+        return row('cut','חיתוך','nCut','Cut')+row('crease','קיפול','nCrease','Crease')+row('kiss','חיתוך נשיקה','nKiss','Kiss-cut')+row('vcut','V-CUT','nVcut','V-CUT')+row('marks','נקודות (מארקים)','nMarks','Regmarks')})()}</div>
       <p class="hint">מופיעות רק שכבות שיש בעבודה. מורידים סימון כדי לא לכלול שכבה בקובץ. הנקודות נכנסות כעיגולים בשכבה משלהן.</p></fieldset>
     ${window.desk?`<fieldset class="exdirs"><legend>לאן לשמור</legend>${[['print','PDF להדפסה'],['cut','PDF לחיתוך'],['dxf','DXF']].map(([k,l])=>`<div class="deskrow exdir"><b>${l}</b><span class="mono small" dir="ltr" data-exdirlbl="${k}">…</span><input type="hidden" name="dir_${k}" value="${esc((ex.dirs||{})[k]||'')}"><button type="button" class="btn sm" data-exdir="${k}">שנה…</button></div>`).join('')}<p class="hint" style="margin:2px 0 0">התיקיות נשמרות גם בתצורת הייצוא.</p></fieldset>`:''}
     <label class="field">שם לקבצים כשאין מארק טקסט<input type="text" name="base" value="${esc(def)}"></label></div>`,
@@ -3470,8 +3475,8 @@ $('#expBtn').addEventListener('click',async()=>{
       ov.addEventListener('click',async e=>{const b=e.target.closest('[data-exdir]');if(!b)return;e.preventDefault();e.stopPropagation();const k=b.dataset.exdir;const h=ov.querySelector(`[name="dir_${k}"]`);const l=ov.querySelector(`[data-exdirlbl="${k}"]`);const p=await window.desk.pickFolder(h.value||l.textContent);if(p){h.value=p;lblDirs()}},true)}
     const F=n=>ov.querySelector(`[name="${n}"]`);const dx=ov.querySelector('.exdxf');
     const getDirs=()=>Object.fromEntries(['print','cut','dxf'].map(k=>[k,(ov.querySelector(`[name="dir_${k}"]`)||{}).value||'']).filter(x=>x[1]));
-    const getCfg=()=>({dirs:getDirs(),dxfOff:Object.fromEntries(['cut','crease','kiss','marks'].filter(k=>F('on_'+k)&&!F('on_'+k).checked).map(k=>[k,1])),print:F('print').checked,cut:F('cut').checked,cutfmt:F('cutfmt').value,which:(ov.querySelector('[name=which]:checked')||{}).value||'all',dxfL:{cut:F('nCut').value.trim(),crease:F('nCrease').value.trim(),kiss:F('nKiss').value.trim(),marks:F('nMarks').value.trim()}});
-    const setCfg=c=>{F('print').checked=c.print!==false;F('cut').checked=c.cut!==false;F('cutfmt').value=c.cutfmt||'pdf';const w=ov.querySelector(`[name=which][value="${c.which||'all'}"]`);if(w)w.checked=true;cust.hidden=(c.which||'all')!=='custom';const d=c.dxfL||{};F('nCut').value=d.cut||'Cut';F('nCrease').value=d.crease||'Crease';F('nKiss').value=d.kiss||'Kiss-cut';F('nMarks').value=d.marks||'Regmarks';for(const k of['cut','crease','kiss','marks'])if(F('on_'+k))F('on_'+k).checked=!(c.dxfOff||{})[k];dx.hidden=F('cutfmt').value==='pdf';for(const k of['print','cut','dxf']){const h=ov.querySelector(`[name="dir_${k}"]`);if(h)h.value=(c.dirs||{})[k]||''}if(ov._lblDirs)ov._lblDirs()};
+    const getCfg=()=>({dirs:getDirs(),dxfOff:Object.fromEntries(['cut','crease','kiss','vcut','marks'].filter(k=>F('on_'+k)&&!F('on_'+k).checked).map(k=>[k,1])),print:F('print').checked,cut:F('cut').checked,cutfmt:F('cutfmt').value,which:(ov.querySelector('[name=which]:checked')||{}).value||'all',dxfL:{cut:F('nCut').value.trim(),crease:F('nCrease').value.trim(),kiss:F('nKiss').value.trim(),vcut:F('nVcut').value.trim(),marks:F('nMarks').value.trim()}});
+    const setCfg=c=>{F('print').checked=c.print!==false;F('cut').checked=c.cut!==false;F('cutfmt').value=c.cutfmt||'pdf';const w=ov.querySelector(`[name=which][value="${c.which||'all'}"]`);if(w)w.checked=true;cust.hidden=(c.which||'all')!=='custom';const d=c.dxfL||{};F('nCut').value=d.cut||'Cut';F('nCrease').value=d.crease||'Crease';F('nKiss').value=d.kiss||'Kiss-cut';if(F('nVcut'))F('nVcut').value=d.vcut||S.cfg.outVcut||'V-CUT';F('nMarks').value=d.marks||'Regmarks';for(const k of['cut','crease','kiss','vcut','marks'])if(F('on_'+k))F('on_'+k).checked=!(c.dxfOff||{})[k];dx.hidden=F('cutfmt').value==='pdf';for(const k of['print','cut','dxf']){const h=ov.querySelector(`[name="dir_${k}"]`);if(h)h.value=(c.dirs||{})[k]||''}if(ov._lblDirs)ov._lblDirs()};
     ov.addEventListener('change',e=>{if(e.target.name==='which')cust.hidden=e.target.value!=='custom';if(e.target.name==='cutfmt')dx.hidden=e.target.value==='pdf';
       if(e.target.name==='preset'){const p=PR.find(x=>x.id===e.target.value);if(p)setCfg(p);ov.querySelector('[data-exdel]').disabled=!p}});
     ov.addEventListener('click',e=>{const sv=e.target.closest('[data-exsave]'),dl2=e.target.closest('[data-exdel]');if(!sv&&!dl2)return;e.preventDefault();e.stopPropagation();const sel=F('preset');
@@ -3484,7 +3489,7 @@ $('#expBtn').addEventListener('click',async()=>{
       if(b.dataset.exnone){boxes.forEach(x=>x.checked=false);return}const c=b.dataset.excode;const mine=boxes.filter(x=>x.dataset.code===c);const all=mine.every(x=>x.checked);mine.forEach(x=>x.checked=!all)},true)}
   const r=await pr;
   if(r.v!=='go')return;const base=(r.vals.base||def).replace(/[\\/:*?"<>|]+/g,'-').trim()||'layout';
-  const v=r.vals;S.cfg.dxfOff={};for(const k of['cut','crease','kiss','marks'])if(v['on_'+k]===false)S.cfg.dxfOff[k]=1;S.cfg.dxfL={cut:(v.nCut||'Cut').trim(),crease:(v.nCrease||'Crease').trim(),kiss:(v.nKiss||'Kiss-cut').trim(),marks:(v.nMarks||'Regmarks').trim()};
+  const v=r.vals;S.cfg.dxfOff={};for(const k of['cut','crease','kiss','vcut','marks'])if(v['on_'+k]===false)S.cfg.dxfOff[k]=1;S.cfg.dxfL={cut:(v.nCut||'Cut').trim(),crease:(v.nCrease||'Crease').trim(),kiss:(v.nKiss||'Kiss-cut').trim(),vcut:(v.nVcut||'V-CUT').trim(),marks:(v.nMarks||'Regmarks').trim()};
   S.cfg.exp={print:!!v.print,cut:!!v.cut,cutfmt:v.cutfmt||'pdf',which:v.which||'all',preset:v.preset||'',dirs:Object.fromEntries(['print','cut','dxf'].map(k=>[k,v['dir_'+k]||'']).filter(x=>x[1]))};saveSettings();
   if(!v.print&&!v.cut){toast('לא נבחר קובץ לייצוא');return}
   const sheets=v.which==='cur'?[curSheet()].filter(Boolean):v.which==='custom'?S.sheets.filter((x,i)=>v['sh_'+i]):S.sheets.slice();if(!sheets.length){toast('לא נבחרו גיליונות לייצוא');return}
